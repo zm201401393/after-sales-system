@@ -1,18 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { getDb } = require('../db');
+const { getDb, query } = require('../db');
 
 router.get('/', async (req, res) => {
-  const db = await getDb();
-  const results = db.exec('SELECT * FROM orders ORDER BY created_at DESC');
-  if (!results.length) return res.json([]);
-
-  const columns = results[0].columns;
-  const rows = results[0].values.map(row => {
-    const obj = {};
-    columns.forEach((col, i) => obj[col] = row[i]);
-    return obj;
-  });
+  await getDb();
+  const { consumer_id } = req.query;
+  let sql = 'SELECT o.*, c.name as buyer_name, c.phone as buyer_phone FROM orders o LEFT JOIN consumers c ON o.consumer_id=c.id';
+  const params = [];
+  if (consumer_id) { sql += ' WHERE o.consumer_id=?'; params.push(parseInt(consumer_id)); }
+  sql += ' ORDER BY o.created_at DESC';
+  const rows = query(sql, params);
   res.json(rows);
 });
 
