@@ -100,6 +100,20 @@
                 </div>
               </div>
 
+              <!-- Detail Analysis (new) -->
+              <div class="ai-analysis" v-if="aiSuggestion.detailAnalysis && aiSuggestion.detailAnalysis.length">
+                <div class="ai-section-title">详细分析报告</div>
+                <div class="ai-detail-blocks">
+                  <div v-for="(block, idx) in aiSuggestion.detailAnalysis" :key="idx" class="ai-detail-block">
+                    <div class="detail-block-header">
+                      <span class="detail-block-cat">{{ block.category }}</span>
+                      <span class="detail-block-data" v-if="block.data">{{ block.data }}</span>
+                    </div>
+                    <div class="detail-block-content">{{ block.content }}</div>
+                  </div>
+                </div>
+              </div>
+
               <!-- References -->
               <div class="ai-analysis" v-if="aiSuggestion.references && aiSuggestion.references.length">
                 <div class="ai-section-title">参考信息</div>
@@ -303,7 +317,7 @@ const typeMap = { return: '退货', exchange: '换货', repair: '维修', refund
 const priorityMap = { urgent: '紧急', high: '高', normal: '普通', low: '低' }
 const statusMap = { pending: '待审核', approved: '已通过', rejected: '已拒绝', feedback_required: '待反馈', completed: '已完成' }
 const vipLevelMap = { 0: '普通', 1: '银卡', 2: '金卡', 3: '钻石' }
-const refTypeMap = { user_tag: '用户标签', history: '历史记录', communication: '沟通记录', order: '订单信息' }
+const refTypeMap = { user_tag: '用户标签', history: '历史记录', communication: '沟通记录', order: '订单信息', remark: '客服备注' }
 
 const showActions = computed(() => detail.value && ['pending', 'approved'].includes(detail.value.status))
 
@@ -601,6 +615,41 @@ onMounted(async () => {
 .ref-history { background: #fef3c7; color: #92400e; }
 .ref-communication { background: #d1fae5; color: #065f46; }
 .ref-order { background: #e0e7ff; color: #3730a3; }
+.ref-remark { background: #fce7f3; color: #9d174d; }
+
+/* Detail Analysis Blocks */
+.ai-detail-blocks { display: flex; flex-direction: column; gap: 10px; }
+.ai-detail-block {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.detail-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid #f3f4f6;
+}
+.detail-block-cat {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+}
+.detail-block-data {
+  font-size: 11px;
+  color: #6b7280;
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+}
+.detail-block-content {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.7;
+  white-space: pre-line;
+}
 .ref-label { color: #6b7280; flex-shrink: 0; }
 .ref-value { color: #374151; font-weight: 500; }
 .impact-positive { color: #059669; }
