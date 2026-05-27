@@ -1,7 +1,9 @@
 {
-  "build": {},
+  "build": {
+    "buildCommand": "npm install --prefix server"
+  },
   "deploy": {
-    "startCommand": "cd server && npm install && node index.js",
+    "startCommand": "node server/index.js",
     "restartPolicyType": "ON_FAILURE"
   }
 }
