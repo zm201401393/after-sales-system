@@ -77,7 +77,7 @@ export const useServiceOrderStore = defineStore('serviceOrder', () => {
 
   async function approve(id, data = {}) {
     try {
-      const response = await axios.post(`/api/service-orders/${id}/approve`, data)
+      const response = await axios.put(`/api/service-orders/${id}/approve`, data)
       return response.data
     } catch (error) {
       console.error('Failed to approve:', error)
@@ -87,7 +87,7 @@ export const useServiceOrderStore = defineStore('serviceOrder', () => {
 
   async function reject(id, data = {}) {
     try {
-      const response = await axios.post(`/api/service-orders/${id}/reject`, data)
+      const response = await axios.put(`/api/service-orders/${id}/reject`, data)
       return response.data
     } catch (error) {
       console.error('Failed to reject:', error)
@@ -97,7 +97,7 @@ export const useServiceOrderStore = defineStore('serviceOrder', () => {
 
   async function feedback(id, data = {}) {
     try {
-      const response = await axios.post(`/api/service-orders/${id}/feedback`, data)
+      const response = await axios.put(`/api/service-orders/${id}/feedback`, data)
       return response.data
     } catch (error) {
       console.error('Failed to submit feedback:', error)
@@ -107,7 +107,7 @@ export const useServiceOrderStore = defineStore('serviceOrder', () => {
 
   async function complete(id) {
     try {
-      const response = await axios.post(`/api/service-orders/${id}/complete`)
+      const response = await axios.put(`/api/service-orders/${id}/complete`)
       return response.data
     } catch (error) {
       console.error('Failed to complete:', error)
@@ -117,7 +117,7 @@ export const useServiceOrderStore = defineStore('serviceOrder', () => {
 
   async function rate(id, data = {}) {
     try {
-      const response = await axios.post(`/api/service-orders/${id}/rate`, data)
+      const response = await axios.put(`/api/service-orders/${id}/rate`, data)
       return response.data
     } catch (error) {
       console.error('Failed to rate:', error)
@@ -167,7 +167,11 @@ export const useServiceOrderStore = defineStore('serviceOrder', () => {
 
   async function addCommunication(id, data = {}) {
     try {
-      const response = await axios.post(`/api/service-orders/${id}/communications`, data)
+      const payload = {
+        sender_type: data.sender_type || data.sender || 'merchant',
+        message: data.message || data.content || ''
+      }
+      const response = await axios.post(`/api/service-orders/${id}/communications`, payload)
       return response.data
     } catch (error) {
       console.error('Failed to add communication:', error)

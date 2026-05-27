@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb, saveDb, query, run } = require('../db');
-const { getAISuggestion } = require('../services/aiSuggestion');
+const { getAISuggestion, getBatchAISuggestions } = require('../services/aiSuggestion');
 
 function generateServiceNo() {
   const now = new Date();
@@ -60,6 +60,14 @@ router.get('/:id/ai-suggestion', async (req, res) => {
   const suggestion = getAISuggestion(parseInt(req.params.id));
   if (!suggestion) return res.status(404).json({ error: '无法生成建议' });
   res.json(suggestion);
+});
+
+router.post('/batch-ai-suggestions', async (req, res) => {
+  await getDb();
+  const { ids } = req.body;
+  if (!ids || !ids.length) return res.status(400).json({ error: '请提供服务单ID列表' });
+  const results = getBatchAISuggestions(ids);
+  res.json(results);
 });
 
 router.post('/', async (req, res) => {

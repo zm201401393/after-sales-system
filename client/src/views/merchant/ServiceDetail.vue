@@ -1,287 +1,272 @@
 <template>
   <div class="service-detail" v-loading="pageLoading">
     <div class="detail-header">
-      <el-button @click="$router.back()" :icon="ArrowLeft">返回</el-button>
-      <h2>服务单详情</h2>
-      <el-tag v-if="detail" :type="statusTagType[detail.status]" effect="dark" size="large">
-        {{ statusMap[detail.status] || detail.status }}
-      </el-tag>
+      <button class="back-btn" @click="$router.back()">← 返回</button>
+      <div class="header-info">
+        <h2>{{ detail?.service_no || '' }}</h2>
+        <span class="status-tag" :class="'s-' + detail?.status" v-if="detail">
+          {{ statusMap[detail.status] || detail.status }}
+        </span>
+      </div>
     </div>
 
     <template v-if="detail">
-      <el-row :gutter="20">
-        <!-- LEFT COLUMN -->
-        <el-col :span="16">
+      <div class="detail-grid">
+        <div class="left-col">
           <!-- 服务单信息 -->
-          <el-card class="detail-card">
-            <template #header><span class="card-title">服务单信息</span></template>
-            <el-descriptions :column="2" border>
-              <el-descriptions-item label="服务单号">{{ detail.service_no }}</el-descriptions-item>
-              <el-descriptions-item label="当前状态">
-                <el-tag :type="statusTagType[detail.status]" effect="dark">
-                  {{ statusMap[detail.status] || detail.status }}
-                </el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="服务类型">
-                <el-tag>{{ typeMap[detail.type] || detail.type }}</el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="优先级">
-                <el-tag :type="priorityTagType[detail.priority]">
-                  {{ priorityMap[detail.priority] || detail.priority || '普通' }}
-                </el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="申请原因" :span="2">{{ detail.reason || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="详细描述" :span="2">{{ detail.description || '无' }}</el-descriptions-item>
-              <el-descriptions-item label="退款金额">
-                <span v-if="detail.refund_amount" class="price">¥{{ detail.refund_amount }}</span>
-                <span v-else>-</span>
-              </el-descriptions-item>
-              <el-descriptions-item label="实际退款金额">
-                <span v-if="detail.actual_refund_amount" class="price">¥{{ detail.actual_refund_amount }}</span>
-                <span v-else>-</span>
-              </el-descriptions-item>
-              <el-descriptions-item label="申请时间">{{ formatTime(detail.created_at) }}</el-descriptions-item>
-              <el-descriptions-item label="更新时间">{{ formatTime(detail.updated_at) }}</el-descriptions-item>
-            </el-descriptions>
-          </el-card>
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">服务单信息</span>
+            </div>
+            <div class="card-body">
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">服务类型</span>
+                  <span class="type-tag">{{ typeMap[detail.type] || detail.type }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">优先级</span>
+                  <span class="priority-indicator" :class="'p-' + detail.priority">{{ priorityMap[detail.priority] || '普通' }}</span>
+                </div>
+                <div class="info-item full">
+                  <span class="info-label">申请原因</span>
+                  <span class="info-value">{{ detail.reason || '-' }}</span>
+                </div>
+                <div class="info-item full">
+                  <span class="info-label">详细描述</span>
+                  <span class="info-value desc">{{ detail.description || '无' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">退款金额</span>
+                  <span class="price" v-if="detail.refund_amount">¥{{ detail.refund_amount }}</span>
+                  <span v-else class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">实退金额</span>
+                  <span class="price" v-if="detail.actual_refund_amount">¥{{ detail.actual_refund_amount }}</span>
+                  <span v-else class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">申请时间</span>
+                  <span class="info-value">{{ formatTime(detail.created_at) }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">更新时间</span>
+                  <span class="info-value">{{ formatTime(detail.updated_at) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- 关联订单 -->
-          <el-card class="detail-card">
-            <template #header><span class="card-title">关联订单</span></template>
-            <div class="order-info">
-              <img
-                :src="detail.product_image || 'https://via.placeholder.com/100'"
-                class="product-img"
-              />
-              <div class="order-meta">
-                <h3>{{ detail.product_name }}</h3>
-                <p>订单号：{{ detail.order_no }}</p>
-                <p>单价：<span class="price">¥{{ detail.price }}</span></p>
-                <p>数量：{{ detail.quantity || 1 }}</p>
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">关联订单</span>
+            </div>
+            <div class="card-body">
+              <div class="order-info">
+                <img :src="detail.product_image || 'https://via.placeholder.com/80'" class="product-img" />
+                <div class="order-meta">
+                  <h4>{{ detail.product_name }}</h4>
+                  <p>订单号：<span class="mono">{{ detail.order_no }}</span></p>
+                  <p>单价：<span class="price">¥{{ detail.price }}</span> × {{ detail.quantity || 1 }}</p>
+                </div>
               </div>
             </div>
-          </el-card>
+          </div>
 
           <!-- AI审核建议 -->
-          <el-card class="detail-card ai-suggestion-card">
-            <template #header>
-              <div class="ai-header">
-                <span class="card-title">AI审核建议</span>
-                <el-tag type="info" size="small">智能分析</el-tag>
+          <div class="card ai-card">
+            <div class="card-head">
+              <span class="card-title">AI 审核建议</span>
+              <span class="ai-badge">智能分析</span>
+            </div>
+            <div class="card-body" v-if="aiLoading" v-loading="true" style="min-height: 100px;"></div>
+            <div class="card-body" v-else-if="aiSuggestion">
+              <!-- One-line conclusion -->
+              <div class="ai-conclusion-box" :class="'ai-' + aiSuggestion.action">
+                <span class="ai-action-icon">{{ aiSuggestion.action === 'approve' ? '✓' : aiSuggestion.action === 'reject' ? '✗' : '?' }}</span>
+                <span class="ai-conclusion-text">{{ aiSuggestion.summary }}</span>
               </div>
-            </template>
-            <div v-if="aiLoading" v-loading="true" style="height: 120px;"></div>
-            <div v-else-if="aiSuggestion">
-              <div class="ai-action-row">
-                <span class="ai-label">建议操作：</span>
-                <el-tag
-                  :type="aiActionTagType[aiSuggestion.action]"
-                  effect="dark"
-                  size="large"
-                >
-                  {{ aiActionMap[aiSuggestion.action] || aiSuggestion.action }}
-                </el-tag>
+
+              <!-- Analysis reasoning -->
+              <div class="ai-analysis">
+                <div class="ai-section-title">分析依据</div>
+                <div class="ai-reasons">
+                  <div v-for="(reason, idx) in aiSuggestion.reasoning" :key="idx" class="ai-reason-item">
+                    <span class="reason-bullet" :class="'ai-' + aiSuggestion.action"></span>
+                    <span class="reason-text">{{ reason }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="ai-confidence-row">
-                <span class="ai-label">置信度：</span>
-                <el-progress
-                  :percentage="Math.round((aiSuggestion.confidence || 0) * 100)"
-                  :color="getConfidenceColor(aiSuggestion.confidence)"
-                  :stroke-width="16"
-                  style="flex: 1;"
-                />
+
+              <!-- References -->
+              <div class="ai-analysis" v-if="aiSuggestion.references && aiSuggestion.references.length">
+                <div class="ai-section-title">参考信息</div>
+                <div class="ai-refs">
+                  <div v-for="(ref, idx) in aiSuggestion.references" :key="idx" class="ai-ref-item">
+                    <span class="ref-type" :class="'ref-' + ref.type">{{ refTypeMap[ref.type] || ref.type }}</span>
+                    <span class="ref-label">{{ ref.label }}：</span>
+                    <span class="ref-value" :class="'impact-' + ref.impact">{{ ref.value }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="ai-reasoning">
-                <span class="ai-label">分析理由：</span>
-                <el-timeline class="reasoning-timeline">
-                  <el-timeline-item
-                    v-for="(reason, idx) in aiSuggestion.reasons || []"
-                    :key="idx"
-                    :color="aiActionColor[aiSuggestion.action] || '#409eff'"
-                  >
-                    {{ reason }}
-                  </el-timeline-item>
-                </el-timeline>
-              </div>
+
+              <!-- Adopt button -->
               <div class="ai-adopt" v-if="detail.status === 'pending'">
-                <el-button type="primary" @click="adoptSuggestion" :loading="adoptLoading">
-                  采纳建议
-                </el-button>
+                <button class="adopt-btn" :class="'adopt-' + aiSuggestion.action" @click="adoptSuggestion" :disabled="adoptLoading">
+                  {{ adoptLoading ? '处理中...' : '采纳建议' }}
+                </button>
               </div>
             </div>
-            <el-empty v-else description="暂无AI建议" :image-size="60" />
-          </el-card>
+            <div class="card-body empty-ai" v-else>
+              <span>暂无AI建议</span>
+            </div>
+          </div>
 
           <!-- 协商记录 -->
-          <el-card class="detail-card">
-            <template #header><span class="card-title">协商记录</span></template>
-            <div class="chat-container" v-if="communications.length > 0">
-              <div
-                v-for="(msg, idx) in communications"
-                :key="idx"
-                class="chat-message"
-                :class="{ 'is-merchant': msg.sender === 'merchant', 'is-consumer': msg.sender === 'consumer' }"
-              >
-                <div class="chat-sender">
-                  {{ msg.sender === 'merchant' ? '商家' : '消费者' }}
-                </div>
-                <div class="chat-bubble">
-                  {{ msg.content }}
-                </div>
-                <div class="chat-time">{{ formatTime(msg.created_at) }}</div>
-              </div>
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">协商记录</span>
+              <span class="count-badge" v-if="communications.length">{{ communications.length }}</span>
             </div>
-            <el-empty v-else description="暂无协商记录" :image-size="60" />
-            <div class="chat-input">
-              <el-input
-                v-model="newMessage"
-                placeholder="输入消息..."
-                @keyup.enter="sendMessage"
-              />
-              <el-button type="primary" @click="sendMessage" :loading="sendingMessage" :disabled="!newMessage.trim()">
-                发送
-              </el-button>
-            </div>
-          </el-card>
-        </el-col>
-
-        <!-- RIGHT COLUMN -->
-        <el-col :span="8">
-          <!-- 消费者画像 -->
-          <el-card class="detail-card">
-            <template #header><span class="card-title">消费者画像</span></template>
-            <div class="consumer-profile">
-              <div class="profile-item">
-                <span class="profile-label">买家姓名</span>
-                <span class="profile-value">{{ detail.buyer_name }}</span>
-              </div>
-              <div class="profile-item">
-                <span class="profile-label">VIP等级</span>
-                <span class="profile-value">
-                  <el-tag :type="vipTagType[detail.vip_level]" effect="dark" size="small">
-                    {{ vipLevelMap[detail.vip_level] || '普通' }}
-                  </el-tag>
-                </span>
-              </div>
-              <div class="profile-item">
-                <span class="profile-label">信用评分</span>
-                <el-progress
-                  :percentage="detail.credit_score || 80"
-                  :color="getCreditColor(detail.credit_score || 80)"
-                  :stroke-width="12"
-                />
-              </div>
-              <div class="profile-item">
-                <span class="profile-label">历史订单数</span>
-                <span class="profile-value">{{ detail.order_count || 0 }} 单</span>
-              </div>
-              <div class="profile-item">
-                <span class="profile-label">退货率</span>
-                <el-progress
-                  :percentage="detail.return_rate || 0"
-                  :color="(detail.return_rate || 0) > 20 ? '#f56c6c' : '#67c23a'"
-                  :stroke-width="12"
-                />
-              </div>
-            </div>
-          </el-card>
-
-          <!-- 状态流转 -->
-          <el-card class="detail-card">
-            <template #header><span class="card-title">状态流转</span></template>
-            <div v-if="timelineLoading" v-loading="true" style="height: 100px;"></div>
-            <el-timeline v-else-if="timelineEvents.length > 0">
-              <el-timeline-item
-                v-for="(event, idx) in timelineEvents"
-                :key="idx"
-                :color="timelineColor[event.type] || '#409eff'"
-                :timestamp="formatTime(event.timestamp)"
-                placement="top"
-              >
-                <div class="timeline-title">{{ event.title }}</div>
-                <div class="timeline-desc" v-if="event.description">{{ event.description }}</div>
-              </el-timeline-item>
-            </el-timeline>
-            <el-empty v-else description="暂无流转记录" :image-size="60" />
-          </el-card>
-
-          <!-- 物流信息 -->
-          <el-card class="detail-card">
-            <template #header><span class="card-title">物流信息</span></template>
-            <div v-if="logisticsLoading" v-loading="true" style="height: 80px;"></div>
-            <template v-else-if="logistics">
-              <div class="logistics-info">
-                <div class="logistics-item">
-                  <span class="logistics-label">物流公司：</span>
-                  <span>{{ logistics.carrier || '-' }}</span>
-                </div>
-                <div class="logistics-item">
-                  <span class="logistics-label">运单号：</span>
-                  <span>{{ logistics.tracking_no || '-' }}</span>
-                </div>
-                <div class="logistics-item">
-                  <span class="logistics-label">状态：</span>
-                  <el-tag size="small">{{ logistics.status || '待发货' }}</el-tag>
-                </div>
-              </div>
-              <el-steps
-                v-if="logistics.steps && logistics.steps.length > 0"
-                direction="vertical"
-                :active="logistics.steps.length - 1"
-                class="logistics-steps"
-              >
-                <el-step
-                  v-for="(step, idx) in logistics.steps"
+            <div class="card-body">
+              <div class="chat-container" v-if="communications.length > 0">
+                <div
+                  v-for="(msg, idx) in communications"
                   :key="idx"
-                  :title="step.title"
-                  :description="step.time"
+                  class="chat-msg"
+                  :class="{ 'is-merchant': msg.sender_type === 'merchant' || msg.sender === 'merchant' }"
+                >
+                  <div class="chat-avatar">{{ (msg.sender_type || msg.sender) === 'merchant' ? '商' : '客' }}</div>
+                  <div class="chat-body">
+                    <div class="chat-bubble">{{ msg.message || msg.content }}</div>
+                    <div class="chat-time">{{ formatTime(msg.created_at) }}</div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="empty-chat">暂无协商记录</div>
+              <div class="chat-input">
+                <input
+                  v-model="newMessage"
+                  placeholder="输入消息..."
+                  @keyup.enter="sendMessage"
+                  class="msg-input"
                 />
-              </el-steps>
-            </template>
-            <el-empty v-else description="暂无物流信息" :image-size="60" />
-          </el-card>
+                <button class="send-btn" @click="sendMessage" :disabled="!newMessage.trim() || sendingMessage">
+                  发送
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="right-col">
+          <!-- 消费者画像 -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">消费者画像</span>
+            </div>
+            <div class="card-body">
+              <div class="profile">
+                <div class="profile-row">
+                  <span class="profile-label">买家</span>
+                  <span class="profile-value">
+                    {{ detail.buyer_name }}
+                    <span v-if="detail.vip_level > 0" class="vip-badge-lg">{{ vipLevelMap[detail.vip_level] }}</span>
+                  </span>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-label">信用评分</span>
+                  <div class="score-bar">
+                    <div class="score-fill" :style="{ width: (detail.credit_score || 0) + '%', background: getCreditColor(detail.credit_score) }"></div>
+                    <span class="score-text">{{ detail.credit_score || 0 }}</span>
+                  </div>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-label">历史订单</span>
+                  <span class="profile-value">{{ detail.order_count || 0 }} 单</span>
+                </div>
+                <div class="profile-row">
+                  <span class="profile-label">退货率</span>
+                  <div class="score-bar">
+                    <div class="score-fill" :style="{ width: Math.min(detail.return_rate || 0, 100) + '%', background: (detail.return_rate || 0) > 20 ? '#ef4444' : '#10b981' }"></div>
+                    <span class="score-text">{{ (detail.return_rate || 0).toFixed(1) }}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- 操作 -->
-          <el-card class="detail-card" v-if="showActions">
-            <template #header><span class="card-title">操作</span></template>
-            <div class="action-area">
+          <div class="card" v-if="showActions">
+            <div class="card-head">
+              <span class="card-title">操作</span>
+            </div>
+            <div class="card-body">
               <template v-if="detail.status === 'pending'">
-                <el-form label-position="top">
-                  <el-form-item label="备注信息">
-                    <el-input
-                      v-model="actionRemark"
-                      type="textarea"
-                      :rows="3"
-                      placeholder="备注信息（拒绝和待反馈时必填）"
-                    />
-                  </el-form-item>
-                  <el-form-item label="退款金额">
-                    <el-input-number
-                      v-model="actionRefundAmount"
-                      :min="0"
-                      :max="detail.refund_amount || 99999"
-                      :precision="2"
-                      :step="0.01"
-                      style="width: 100%;"
-                      placeholder="退款金额"
-                    />
-                  </el-form-item>
-                </el-form>
-                <div class="action-buttons">
-                  <el-button type="success" @click="handleApprove" :loading="acting">通过</el-button>
-                  <el-button type="danger" @click="handleReject" :loading="acting">拒绝</el-button>
-                  <el-button type="warning" @click="handleFeedback" :loading="acting">待反馈</el-button>
+                <textarea v-model="actionRemark" class="action-textarea" placeholder="备注信息（拒绝/待反馈时必填）" rows="3"></textarea>
+                <div class="refund-row" v-if="detail.refund_amount">
+                  <span class="refund-label">退款金额</span>
+                  <el-input-number v-model="actionRefundAmount" :min="0" :max="detail.refund_amount || 99999" :precision="2" :step="0.01" size="small" style="width: 100%;" />
+                </div>
+                <div class="action-btns">
+                  <button class="btn btn-approve" @click="handleApprove" :disabled="acting">通过</button>
+                  <button class="btn btn-reject" @click="handleReject" :disabled="acting">拒绝</button>
+                  <button class="btn btn-feedback" @click="handleFeedback" :disabled="acting">待反馈</button>
                 </div>
               </template>
               <template v-if="detail.status === 'approved'">
-                <el-button type="primary" @click="handleComplete" :loading="acting" style="width: 100%;">
-                  标记完成
-                </el-button>
+                <button class="btn btn-complete" @click="handleComplete" :disabled="acting" style="width: 100%;">标记完成</button>
               </template>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
+          </div>
+
+          <!-- 状态流转 -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">状态流转</span>
+            </div>
+            <div class="card-body" v-if="timelineLoading" v-loading="true" style="min-height: 80px;"></div>
+            <div class="card-body" v-else-if="timelineEvents.length > 0">
+              <div class="timeline">
+                <div v-for="(event, idx) in timelineEvents" :key="idx" class="tl-item" :class="{ last: idx === timelineEvents.length - 1 }">
+                  <div class="tl-dot" :class="'tl-' + (event.event_type || event.type)"></div>
+                  <div class="tl-content">
+                    <div class="tl-title">{{ event.title }}</div>
+                    <div class="tl-desc" v-if="event.description">{{ event.description }}</div>
+                    <div class="tl-time">{{ formatTime(event.created_at || event.timestamp) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card-body empty-chat" v-else>暂无流转记录</div>
+          </div>
+
+          <!-- 物流信息 -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">物流信息</span>
+            </div>
+            <div class="card-body" v-if="logisticsLoading" v-loading="true" style="min-height: 60px;"></div>
+            <div class="card-body" v-else-if="logistics && (Array.isArray(logistics) ? logistics.length > 0 : logistics.carrier)">
+              <div class="logistics-info">
+                <template v-if="Array.isArray(logistics)">
+                  <div v-for="(l, idx) in logistics" :key="idx" class="logistics-item">
+                    <p><strong>{{ l.carrier || '-' }}</strong> {{ l.tracking_no || '' }}</p>
+                    <p class="logi-status">{{ l.status || '待发货' }}</p>
+                  </div>
+                </template>
+                <template v-else>
+                  <p><strong>{{ logistics.carrier || '-' }}</strong> {{ logistics.tracking_no || '' }}</p>
+                  <p class="logi-status">{{ logistics.status || '待发货' }}</p>
+                </template>
+              </div>
+            </div>
+            <div class="card-body empty-chat" v-else>暂无物流信息</div>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -290,7 +275,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
 import { useServiceOrderStore } from '@/stores/serviceOrder'
 import dayjs from 'dayjs'
 
@@ -315,103 +299,19 @@ const newMessage = ref('')
 const actionRemark = ref('')
 const actionRefundAmount = ref(0)
 
-const typeMap = {
-  return: '退货',
-  exchange: '换货',
-  repair: '维修',
-  refund_only: '仅退款'
-}
+const typeMap = { return: '退货', exchange: '换货', repair: '维修', refund_only: '仅退款' }
+const priorityMap = { urgent: '紧急', high: '高', normal: '普通', low: '低' }
+const statusMap = { pending: '待审核', approved: '已通过', rejected: '已拒绝', feedback_required: '待反馈', completed: '已完成' }
+const vipLevelMap = { 0: '普通', 1: '银卡', 2: '金卡', 3: '钻石' }
+const refTypeMap = { user_tag: '用户标签', history: '历史记录', communication: '沟通记录', order: '订单信息' }
 
-const priorityMap = {
-  urgent: '紧急',
-  high: '高',
-  normal: '普通',
-  low: '低'
-}
+const showActions = computed(() => detail.value && ['pending', 'approved'].includes(detail.value.status))
 
-const priorityTagType = {
-  urgent: 'danger',
-  high: 'warning',
-  normal: '',
-  low: 'info'
-}
-
-const statusMap = {
-  pending: '待审核',
-  approved: '已通过',
-  rejected: '已拒绝',
-  feedback_required: '待反馈',
-  completed: '已完成'
-}
-
-const statusTagType = {
-  pending: 'warning',
-  approved: 'success',
-  rejected: 'danger',
-  feedback_required: 'info',
-  completed: ''
-}
-
-const vipLevelMap = {
-  0: '普通',
-  1: '银卡',
-  2: '金卡',
-  3: '钻石'
-}
-
-const vipTagType = {
-  0: 'info',
-  1: '',
-  2: 'warning',
-  3: 'danger'
-}
-
-const aiActionMap = {
-  approve: '建议通过',
-  reject: '建议拒绝',
-  feedback: '建议待反馈'
-}
-
-const aiActionTagType = {
-  approve: 'success',
-  reject: 'danger',
-  feedback: 'warning'
-}
-
-const aiActionColor = {
-  approve: '#67c23a',
-  reject: '#f56c6c',
-  feedback: '#e6a23c'
-}
-
-const timelineColor = {
-  created: '#409eff',
-  approved: '#67c23a',
-  rejected: '#f56c6c',
-  feedback: '#e6a23c',
-  completed: '#00d1b2',
-  system: '#909399'
-}
-
-const showActions = computed(() => {
-  return detail.value && ['pending', 'approved'].includes(detail.value.status)
-})
-
-function formatTime(time) {
-  return time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'
-}
-
-function getConfidenceColor(confidence) {
-  const pct = (confidence || 0) * 100
-  if (pct >= 80) return '#67c23a'
-  if (pct >= 60) return '#e6a23c'
-  return '#f56c6c'
-}
-
+function formatTime(time) { return time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-' }
 function getCreditColor(score) {
-  if (score >= 80) return '#67c23a'
-  if (score >= 60) return '#e6a23c'
-  return '#f56c6c'
+  if (score >= 80) return '#10b981'
+  if (score >= 60) return '#f59e0b'
+  return '#ef4444'
 }
 
 async function adoptSuggestion() {
@@ -425,37 +325,24 @@ async function adoptSuggestion() {
     } else if (action === 'reject') {
       await store.reject(detail.value.id, { remark: 'AI建议采纳：拒绝' })
       ElMessage.success('已采纳建议：拒绝')
-    } else if (action === 'feedback') {
+    } else {
       await store.feedback(detail.value.id, { remark: 'AI建议采纳：待反馈' })
       ElMessage.success('已采纳建议：待反馈')
     }
     await store.fetchDetail(route.params.id)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.error || '操作失败')
-  } finally {
-    adoptLoading.value = false
-  }
+  } catch (e) { ElMessage.error(e.response?.data?.error || '操作失败') }
+  finally { adoptLoading.value = false }
 }
 
 async function sendMessage() {
   if (!newMessage.value.trim()) return
   sendingMessage.value = true
   try {
-    await store.addCommunication(detail.value.id, {
-      content: newMessage.value,
-      sender: 'merchant'
-    })
-    communications.value.push({
-      sender: 'merchant',
-      content: newMessage.value,
-      created_at: new Date().toISOString()
-    })
+    await store.addCommunication(detail.value.id, { content: newMessage.value, sender: 'merchant' })
+    communications.value.push({ sender_type: 'merchant', message: newMessage.value, created_at: new Date().toISOString() })
     newMessage.value = ''
-  } catch (e) {
-    ElMessage.error(e.response?.data?.error || '发送失败')
-  } finally {
-    sendingMessage.value = false
-  }
+  } catch (e) { ElMessage.error(e.response?.data?.error || '发送失败') }
+  finally { sendingMessage.value = false }
 }
 
 async function handleApprove() {
@@ -467,45 +354,30 @@ async function handleApprove() {
     await store.approve(detail.value.id, data)
     ElMessage.success('已通过')
     await store.fetchDetail(route.params.id)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.error || '操作失败')
-  } finally {
-    acting.value = false
-  }
+  } catch (e) { ElMessage.error(e.response?.data?.error || '操作失败') }
+  finally { acting.value = false }
 }
 
 async function handleReject() {
-  if (!actionRemark.value.trim()) {
-    ElMessage.warning('拒绝时请填写原因')
-    return
-  }
+  if (!actionRemark.value.trim()) { ElMessage.warning('拒绝时请填写原因'); return }
   acting.value = true
   try {
     await store.reject(detail.value.id, { remark: actionRemark.value })
     ElMessage.success('已拒绝')
     await store.fetchDetail(route.params.id)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.error || '操作失败')
-  } finally {
-    acting.value = false
-  }
+  } catch (e) { ElMessage.error(e.response?.data?.error || '操作失败') }
+  finally { acting.value = false }
 }
 
 async function handleFeedback() {
-  if (!actionRemark.value.trim()) {
-    ElMessage.warning('待反馈时请填写需要消费者提供的信息')
-    return
-  }
+  if (!actionRemark.value.trim()) { ElMessage.warning('请填写需要消费者提供的信息'); return }
   acting.value = true
   try {
     await store.feedback(detail.value.id, { remark: actionRemark.value })
     ElMessage.success('已标记为待反馈')
     await store.fetchDetail(route.params.id)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.error || '操作失败')
-  } finally {
-    acting.value = false
-  }
+  } catch (e) { ElMessage.error(e.response?.data?.error || '操作失败') }
+  finally { acting.value = false }
 }
 
 async function handleComplete() {
@@ -514,307 +386,332 @@ async function handleComplete() {
     await store.complete(detail.value.id)
     ElMessage.success('已完成')
     await store.fetchDetail(route.params.id)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.error || '操作失败')
-  } finally {
-    acting.value = false
-  }
+  } catch (e) { ElMessage.error(e.response?.data?.error || '操作失败') }
+  finally { acting.value = false }
 }
 
 onMounted(async () => {
   const id = route.params.id
   pageLoading.value = true
+  try { await store.fetchDetail(id); if (detail.value?.refund_amount) actionRefundAmount.value = detail.value.refund_amount }
+  catch (e) { ElMessage.error('加载失败'); console.error(e) }
+  finally { pageLoading.value = false }
 
-  try {
-    await store.fetchDetail(id)
-    if (detail.value && detail.value.refund_amount) {
-      actionRefundAmount.value = detail.value.refund_amount
-    }
-  } catch (e) {
-    ElMessage.error('加载服务单详情失败')
-    console.error(e)
-  } finally {
-    pageLoading.value = false
-  }
-
-  // Load AI suggestion
   aiLoading.value = true
-  try {
-    const res = await store.fetchAISuggestion(id)
-    aiSuggestion.value = res
-  } catch (e) {
-    console.error('Failed to load AI suggestion:', e)
-  } finally {
-    aiLoading.value = false
-  }
+  try { aiSuggestion.value = await store.fetchAISuggestion(id) }
+  catch (e) { console.error(e) }
+  finally { aiLoading.value = false }
 
-  // Load communications
-  try {
-    const res = await store.fetchCommunications(id)
-    communications.value = Array.isArray(res) ? res : (res?.list || [])
-  } catch (e) {
-    console.error('Failed to load communications:', e)
-  }
+  try { const res = await store.fetchCommunications(id); communications.value = Array.isArray(res) ? res : (res?.list || []) }
+  catch (e) { console.error(e) }
 
-  // Load timeline
   timelineLoading.value = true
-  try {
-    const res = await store.fetchTimeline(id)
-    timelineEvents.value = Array.isArray(res) ? res : (res?.list || [])
-  } catch (e) {
-    console.error('Failed to load timeline:', e)
-  } finally {
-    timelineLoading.value = false
-  }
+  try { const res = await store.fetchTimeline(id); timelineEvents.value = Array.isArray(res) ? res : (res?.list || []) }
+  catch (e) { console.error(e) }
+  finally { timelineLoading.value = false }
 
-  // Load logistics
   logisticsLoading.value = true
-  try {
-    const res = await store.fetchLogistics(id)
-    logistics.value = res
-  } catch (e) {
-    console.error('Failed to load logistics:', e)
-  } finally {
-    logisticsLoading.value = false
-  }
+  try { logistics.value = await store.fetchLogistics(id) }
+  catch (e) { console.error(e) }
+  finally { logisticsLoading.value = false }
 })
 </script>
 
 <style scoped>
-.service-detail {
-  padding: 20px;
-}
+.service-detail { max-width: 1200px; margin: 0 auto; }
 
 .detail-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 20px;
 }
 
-.detail-header h2 {
-  margin: 0;
-  font-size: 20px;
-  flex: 1;
+.back-btn {
+  border: none;
+  background: #f1f5f9;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.back-btn:hover { background: #e2e8f0; }
+
+.header-info { display: flex; align-items: center; gap: 12px; flex: 1; }
+.header-info h2 { margin: 0; font-size: 18px; font-weight: 600; color: #1e293b; }
+
+.status-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.s-pending { background: #fffbeb; color: #d97706; }
+.s-approved { background: #ecfdf5; color: #059669; }
+.s-rejected { background: #fef2f2; color: #dc2626; }
+.s-feedback_required { background: #f5f3ff; color: #7c3aed; }
+.s-completed { background: #ecfeff; color: #0891b2; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
 }
 
-.detail-card {
-  margin-bottom: 16px;
+.left-col, .right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #f1f5f9;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f8fafc;
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
+  color: #1e293b;
 }
 
-.price {
-  color: #f56c6c;
-  font-weight: 600;
+.card-body { padding: 14px 16px; }
+
+/* Info grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.info-item { display: flex; flex-direction: column; gap: 4px; }
+.info-item.full { grid-column: span 2; }
+.info-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+.info-value { font-size: 13px; color: #374151; }
+.info-value.desc { color: #6b7280; line-height: 1.5; }
+.price { color: #ef4444; font-weight: 600; font-size: 14px; }
+.mono { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: 12px; color: #64748b; }
+
+.type-tag { display: inline-block; padding: 2px 8px; background: #f1f5f9; border-radius: 4px; font-size: 12px; color: #475569; }
+
+.priority-indicator { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
+.p-urgent { background: #fef2f2; color: #dc2626; }
+.p-high { background: #fffbeb; color: #d97706; }
+.p-normal { background: #f8fafc; color: #64748b; }
+.p-low { background: #f8fafc; color: #94a3b8; }
+
+/* Order */
+.order-info { display: flex; gap: 14px; align-items: center; }
+.product-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.order-meta h4 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #1e293b; }
+.order-meta p { margin: 2px 0; font-size: 13px; color: #6b7280; }
+
+/* AI Card */
+.ai-card {
+  border: 1px solid #e0e7ff;
+  background: linear-gradient(135deg, #fafbff 0%, #f5f3ff 100%);
 }
 
-/* Order info */
-.order-info {
+.ai-badge {
+  font-size: 10px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.ai-conclusion-box {
   display: flex;
-  gap: 16px;
-}
-
-.product-img {
-  width: 100px;
-  height: 100px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: 8px;
-  object-fit: cover;
+  margin-bottom: 14px;
+}
+.ai-conclusion-box.ai-approve { background: #ecfdf5; border: 1px solid #a7f3d0; }
+.ai-conclusion-box.ai-reject { background: #fef2f2; border: 1px solid #fecaca; }
+.ai-conclusion-box.ai-request_feedback { background: #fffbeb; border: 1px solid #fde68a; }
+
+.ai-action-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
   flex-shrink: 0;
 }
+.ai-approve .ai-action-icon { background: #10b981; color: #fff; }
+.ai-reject .ai-action-icon { background: #ef4444; color: #fff; }
+.ai-request_feedback .ai-action-icon { background: #f59e0b; color: #fff; }
 
-.order-meta h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
+.ai-conclusion-text { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.4; }
+
+.ai-analysis { margin-bottom: 12px; }
+.ai-section-title { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.ai-reasons { display: flex; flex-direction: column; gap: 6px; }
+.ai-reason-item { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: #374151; line-height: 1.5; }
+.reason-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
 }
+.reason-bullet.ai-approve { background: #10b981; }
+.reason-bullet.ai-reject { background: #ef4444; }
+.reason-bullet.ai-request_feedback { background: #f59e0b; }
 
-.order-meta p {
-  margin: 4px 0;
-  font-size: 14px;
-  color: #606266;
-}
-
-/* AI Suggestion */
-.ai-suggestion-card {
-  border: 2px solid transparent;
-  background: linear-gradient(#fff, #fff) padding-box,
-              linear-gradient(135deg, #667eea 0%, #764ba2 100%) border-box;
+.ai-refs { display: flex; flex-direction: column; gap: 6px; }
+.ai-ref-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+  background: #fff;
   border-radius: 6px;
+  border: 1px solid #f1f5f9;
 }
+.ref-type {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.ref-user_tag { background: #dbeafe; color: #1d4ed8; }
+.ref-history { background: #fef3c7; color: #92400e; }
+.ref-communication { background: #d1fae5; color: #065f46; }
+.ref-order { background: #e0e7ff; color: #3730a3; }
+.ref-label { color: #6b7280; flex-shrink: 0; }
+.ref-value { color: #374151; font-weight: 500; }
+.impact-positive { color: #059669; }
+.impact-negative { color: #dc2626; }
+.impact-neutral { color: #374151; }
 
-.ai-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.ai-adopt { text-align: right; margin-top: 12px; }
+.adopt-btn {
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.15s;
 }
+.adopt-btn:hover { opacity: 0.9; }
+.adopt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.adopt-approve { background: #10b981; }
+.adopt-reject { background: #ef4444; }
+.adopt-request_feedback { background: #f59e0b; }
 
-.ai-action-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.ai-confidence-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.ai-label {
-  font-size: 14px;
-  color: #606266;
-  white-space: nowrap;
-  min-width: 70px;
-}
-
-.reasoning-timeline {
-  padding-left: 0;
-  margin-top: 8px;
-}
-
-.ai-adopt {
-  margin-top: 16px;
-  text-align: right;
-}
+.count-badge { font-size: 11px; background: #e0e7ff; color: #4f46e5; padding: 1px 7px; border-radius: 10px; font-weight: 600; }
 
 /* Chat */
-.chat-container {
-  max-height: 400px;
-  overflow-y: auto;
-  padding: 12px 0;
-  margin-bottom: 12px;
+.chat-container { max-height: 300px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+.chat-msg { display: flex; gap: 8px; }
+.chat-msg.is-merchant { flex-direction: row-reverse; }
+.chat-avatar {
+  width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; flex-shrink: 0;
+  background: #f1f5f9; color: #64748b;
 }
+.chat-msg.is-merchant .chat-avatar { background: #3b82f6; color: #fff; }
+.chat-body { max-width: 75%; }
+.chat-bubble { padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; background: #f1f5f9; color: #374151; }
+.chat-msg.is-merchant .chat-bubble { background: #3b82f6; color: #fff; border-bottom-right-radius: 4px; }
+.chat-msg:not(.is-merchant) .chat-bubble { border-bottom-left-radius: 4px; }
+.chat-time { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+.chat-msg.is-merchant .chat-time { text-align: right; }
+.empty-chat { text-align: center; color: #94a3b8; font-size: 13px; padding: 20px 0; }
+.empty-ai { text-align: center; color: #94a3b8; font-size: 13px; padding: 24px 0; }
 
-.chat-message {
-  margin-bottom: 16px;
+.chat-input { display: flex; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
+.msg-input {
+  flex: 1; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px;
+  font-size: 13px; outline: none; transition: border-color 0.15s;
 }
+.msg-input:focus { border-color: #3b82f6; }
+.send-btn {
+  border: none; background: #3b82f6; color: #fff; padding: 8px 16px; border-radius: 6px;
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s;
+}
+.send-btn:hover { background: #2563eb; }
+.send-btn:disabled { background: #94a3b8; cursor: not-allowed; }
 
-.chat-message.is-consumer {
-  text-align: left;
+/* Profile */
+.profile { display: flex; flex-direction: column; gap: 12px; }
+.profile-row { display: flex; align-items: center; gap: 8px; }
+.profile-label { font-size: 12px; color: #94a3b8; min-width: 60px; }
+.profile-value { font-size: 13px; color: #374151; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.vip-badge-lg {
+  font-size: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff;
+  padding: 2px 6px; border-radius: 4px; font-weight: 600;
 }
-
-.chat-message.is-merchant {
-  text-align: right;
-}
-
-.chat-sender {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 4px;
-}
-
-.chat-bubble {
-  display: inline-block;
-  max-width: 80%;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 14px;
-  line-height: 1.5;
-  text-align: left;
-  word-break: break-word;
-}
-
-.is-consumer .chat-bubble {
-  background: #f0f2f5;
-  color: #303133;
-  border-bottom-left-radius: 4px;
-}
-
-.is-merchant .chat-bubble {
-  background: #409eff;
-  color: #fff;
-  border-bottom-right-radius: 4px;
-}
-
-.chat-time {
-  font-size: 11px;
-  color: #c0c4cc;
-  margin-top: 4px;
-}
-
-.chat-input {
-  display: flex;
-  gap: 8px;
-  border-top: 1px solid #ebeef5;
-  padding-top: 12px;
-}
-
-/* Consumer profile */
-.consumer-profile {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.profile-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.profile-label {
-  font-size: 14px;
-  color: #909399;
-  min-width: 80px;
-}
-
-.profile-value {
-  font-size: 14px;
-  color: #303133;
-  font-weight: 500;
-}
-
-/* Timeline */
-.timeline-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #303133;
-}
-
-.timeline-desc {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-/* Logistics */
-.logistics-info {
-  margin-bottom: 16px;
-}
-
-.logistics-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.logistics-label {
-  color: #909399;
-  min-width: 80px;
-}
-
-.logistics-steps {
-  margin-top: 12px;
-}
+.score-bar { flex: 1; height: 8px; background: #f1f5f9; border-radius: 4px; position: relative; overflow: hidden; }
+.score-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.score-text { position: absolute; right: 6px; top: -1px; font-size: 10px; font-weight: 600; color: #475569; line-height: 10px; }
 
 /* Actions */
-.action-area {
-  padding: 4px 0;
+.action-textarea {
+  width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px;
+  font-size: 13px; resize: none; outline: none; font-family: inherit; margin-bottom: 10px;
 }
+.action-textarea:focus { border-color: #3b82f6; }
+.refund-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.refund-label { font-size: 12px; color: #6b7280; white-space: nowrap; }
+.action-btns { display: flex; gap: 8px; }
+.btn {
+  border: none; padding: 8px 0; border-radius: 6px; font-size: 13px; font-weight: 500;
+  cursor: pointer; flex: 1; transition: opacity 0.15s; color: #fff;
+}
+.btn:hover { opacity: 0.9; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-approve { background: #10b981; }
+.btn-reject { background: #ef4444; }
+.btn-feedback { background: #f59e0b; }
+.btn-complete { background: #3b82f6; }
 
-.action-buttons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+/* Timeline */
+.timeline { display: flex; flex-direction: column; }
+.tl-item { display: flex; gap: 10px; padding-bottom: 14px; position: relative; }
+.tl-item:not(.last)::before {
+  content: ''; position: absolute; left: 5px; top: 14px; bottom: 0; width: 1px; background: #e2e8f0;
 }
+.tl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; background: #94a3b8; }
+.tl-created { background: #3b82f6; }
+.tl-approved { background: #10b981; }
+.tl-rejected { background: #ef4444; }
+.tl-feedback_requested { background: #f59e0b; }
+.tl-completed { background: #06b6d4; }
+.tl-logistics_updated { background: #8b5cf6; }
+.tl-content { min-width: 0; }
+.tl-title { font-size: 13px; font-weight: 500; color: #374151; }
+.tl-desc { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.tl-time { font-size: 11px; color: #94a3b8; margin-top: 2px; }
 
-.action-buttons .el-button {
-  flex: 1;
-}
+/* Logistics */
+.logistics-info p { margin: 4px 0; font-size: 13px; color: #374151; }
+.logistics-item { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f1f5f9; }
+.logistics-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.logi-status { font-size: 12px; color: #6b7280; }
 </style>
