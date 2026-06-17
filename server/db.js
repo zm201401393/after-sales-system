@@ -11,13 +11,197 @@ async function getDb() {
   if (fs.existsSync(DB_PATH)) {
     const buffer = fs.readFileSync(DB_PATH);
     db = new SQL.Database(buffer);
+    ensureAiTables();
+    const cnt = db.exec("SELECT COUNT(*) FROM ai_templates");
+    if (!cnt.length || cnt[0].values[0][0] === 0) seedAiData();
+    saveDb();
   } else {
     db = new SQL.Database();
     initTables();
     seedData();
+    ensureAiTables();
+    seedAiData();
     saveDb();
   }
   return db;
+}
+
+function tableExists(name) {
+  const r = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${name}'`);
+  return r.length > 0 && r[0].values.length > 0;
+}
+
+function ensureAiTables() {
+  db.run(`CREATE TABLE IF NOT EXISTS ai_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    scenario TEXT NOT NULL,
+    agent_name TEXT DEFAULT '小棠',
+    agent_style TEXT DEFAULT 'warm',
+    opening_line TEXT,
+    max_rounds INTEGER DEFAULT 6,
+    allow_refund INTEGER DEFAULT 1,
+    refund_ceiling REAL DEFAULT 50,
+    refund_ratio REAL DEFAULT 0.2,
+    allow_coupon INTEGER DEFAULT 1,
+    coupon_options TEXT DEFAULT '[10,15,20]',
+    allow_reship INTEGER DEFAULT 0,
+    allow_exchange INTEGER DEFAULT 0,
+    handoff_keywords TEXT DEFAULT '["投诉","315","律师","曝光","媒体","起诉"]',
+    description TEXT,
+    is_default INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS ai_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service_order_id INTEGER NOT NULL,
+    template_id INTEGER,
+    channel TEXT NOT NULL,
+    scenario TEXT NOT NULL,
+    merchant_remark TEXT,
+    status TEXT NOT NULL DEFAULT 'running',
+    stage TEXT DEFAULT 'opening',
+    rounds INTEGER DEFAULT 0,
+    proposal_step INTEGER DEFAULT 0,
+    outcome TEXT,
+    outcome_detail TEXT,
+    summary TEXT,
+    started_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    ended_at TEXT,
+    FOREIGN KEY (service_order_id) REFERENCES service_orders(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS ai_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    intent TEXT,
+    emotion TEXT,
+    images TEXT DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    FOREIGN KEY (session_id) REFERENCES ai_sessions(id)
+  )`);
+
+  // 迁移：旧库的 ai_messages 表可能没有 images 列，补上
+  if (!columnExists('ai_messages', 'images')) {
+    db.run(`ALTER TABLE ai_messages ADD COLUMN images TEXT DEFAULT '[]'`);
+  }
+}
+
+function columnExists(table, col) {
+  try {
+    const r = db.exec(`PRAGMA table_info(${table})`);
+    if (!r.length) return false;
+    return r[0].values.some(row => row[1] === col);
+  } catch { return false; }
+}
+
+function seedAiData() {
+  const tpls = [
+    [
+      '标准退款协商', 'negotiate', '小棠', 'warm',
+      '您好呀，我是XX店铺的售后助理小棠，您看您之前那个订单的售后我们这边正在帮您处理～',
+      6, 1, 30, 0.2, 1, '[10,15,20]', 0, 0,
+      '["投诉","315","律师","曝光","媒体","起诉","差评"]',
+      '基础协商模板，适合金额较小的售后协商，可补偿小额现金或优惠券。', 1
+    ],
+    [
+      '高客单价协商', 'negotiate', '小棠', 'professional',
+      '您好，我是您之前订单的专属售后小棠，刚看了下您这个单子，确实给您添麻烦了，我来跟您具体聊一下补偿方案。',
+      8, 1, 200, 0.15, 1, '[50,100,150]', 1, 1,
+      '["投诉","315","律师","曝光","媒体","起诉"]',
+      '高客单价场景，支持更高补贴金额和补发/换货方案。', 0
+    ],
+    [
+      '原因澄清', 'clarify', '小棠', 'warm',
+      '您好呀，我是XX店铺的售后助理小棠，刚收到您提交的售后申请～ 我看了下您填的原因，怕理解有偏差，想再跟您确认下具体情况，方便您讲两句吗？',
+      4, 0, 0, 0, 0, '[]', 0, 0,
+      '["投诉","315","律师","曝光","媒体","起诉"]',
+      '当消费者填写的售后原因不清晰时使用，目标是问出具体的问题点和证据。', 1
+    ],
+  ];
+  for (const t of tpls) {
+    db.run(`INSERT INTO ai_templates (name,scenario,agent_name,agent_style,opening_line,max_rounds,allow_refund,refund_ceiling,refund_ratio,allow_coupon,coupon_options,allow_reship,allow_exchange,handoff_keywords,description,is_default) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, t);
+  }
+  seedDemoSessions();
+}
+
+// 为部分服务单造完整的 AI 协商会话（含完整对话记录 + 总结），保证演示效果与数据分析有数据
+function seedDemoSessions() {
+  const negTplId = query("SELECT id FROM ai_templates WHERE scenario='negotiate' AND is_default=1 LIMIT 1")[0]?.id || 1;
+  const clarifyTplId = query("SELECT id FROM ai_templates WHERE scenario='clarify' LIMIT 1")[0]?.id || 3;
+
+  // 每条：[serviceOrderId, channel, scenario, templateId, status, outcome, remark, summaryObj, messages[]]
+  const demos = [
+    {
+      so: 6, channel: 'voice', scenario: 'negotiate', tpl: negTplId, status: 'achieved', outcome: 'deal',
+      remark: '最多补20', baseTime: '2026-05-17 09:40:00',
+      summary: { headline: '消费者接受¥20打款方案', consumer_need: '因iPad色差申请仅退款，实为不满色差想补偿', summary_text: '消费者因iPad Air色差申请仅退款，沟通中先拒绝¥10券、再拒绝¥15打款，AI在商家¥20上限内争取到¥20打款，消费者最终接受。', negotiation_steps: ['第1步：AI共情并提出¥10优惠券，消费者嫌少拒绝', '第2步：AI让步到¥15打款，消费者仍拒绝', '第3步：AI报上限¥20打款，消费者接受'], outcome: 'deal', deal_detail: '¥20打款补偿', next_action: '48小时内完成¥20打款，无需跟进', engine: 'llm' },
+      msgs: [
+        ['ai', '喂您好，这边是店铺的智能助理小棠，关于您iPad Air的售后单，想跟您聊聊处理方案，方便吗？'],
+        ['consumer', '方便，我就是觉得这颜色跟图片差太多了'],
+        ['ai', '嗯嗯我懂，色差确实挺影响心情的。这样，我先给您申请一张¥10的店铺券，您看行不？'],
+        ['consumer', '才10块也太少了吧'],
+        ['ai', '理解您，我再帮您争取下——给您¥15直接打款到账户，您看呢？'],
+        ['consumer', '还是少，能不能再多点'],
+        ['ai', '这样吧，我跟主管申请到顶了，¥20打款，这是我权限里最高的了，您看能接受不？'],
+        ['consumer', '行吧，那就20吧'],
+        ['ai', '好嘞，那我这就帮您安排¥20打款，到账您留意下哈，有问题随时找我～'],
+      ],
+    },
+    {
+      so: 1, channel: 'im', scenario: 'negotiate', tpl: negTplId, status: 'handoff', outcome: 'handoff',
+      remark: '最多补30', baseTime: '2026-05-12 10:00:00',
+      summary: { headline: '消费者要求换新并投诉，已转人工', consumer_need: 'iPhone屏幕亮点要求换新机，不接受补偿', summary_text: '消费者因iPhone屏幕亮点申请退货，沟通中坚持要换新机并提到要投诉，超出AI补偿权限，已转人工跟进。', negotiation_steps: ['第1步：AI提出¥30补偿，消费者拒绝坚持换新', '第2步：消费者情绪升级提到投诉', '第3步：AI安抚并转人工'], outcome: 'handoff', deal_detail: '', next_action: '⚠️ 立即安排人工客服联系，处理换新诉求', engine: 'llm' },
+      msgs: [
+        ['ai', '您好呀，我是店铺智能助理小棠，您iPhone的售后我帮您看了下，屏幕亮点确实给您添麻烦了。'],
+        ['consumer', '这都新机，必须给我换一台新的'],
+        ['ai', '理解您的心情。换新这块我先帮您申请¥30的补偿，您看能不能先接受？'],
+        ['consumer', '不行，我要换新机，不然我就去投诉你们'],
+        ['ai', '您先别急，这种情况我马上让人工客服跟您联系，他们权限更灵活能处理换新，您稍等哈。'],
+      ],
+    },
+    {
+      so: 2, channel: 'im', scenario: 'clarify', tpl: clarifyTplId, status: 'achieved', outcome: 'clarified',
+      remark: '', baseTime: '2026-05-13 10:40:00',
+      summary: { headline: '已澄清：42码偏大想换40码', consumer_need: '鞋子42码偏大，希望换小一码', summary_text: '消费者原因填写为"尺码不合适"，AI澄清后明确为42码偏大、希望换40码，且确认是收到即发现、已试穿未影响二次销售。', negotiation_steps: ['第1步：AI询问具体哪里不合适', '第2步：消费者说明42码偏大想换40', '第3步：AI确认收货时间和试穿情况，信息完整'], outcome: 'clarified', deal_detail: '换40码', next_action: '按换货流程处理，安排换40码', engine: 'llm' },
+      msgs: [
+        ['ai', '您好呀，我是售后助理小棠，您填的"尺码不合适"我想再跟您确认下，方便说说具体情况吗？'],
+        ['consumer', '就是42码穿着太大了'],
+        ['ai', '好的，那您是想换小一码是吗？想换多少码呢？'],
+        ['consumer', '想换40码，是收到当天试穿就发现大了'],
+        ['ai', '明白啦，42码偏大想换40码，收到当天发现的。信息我都记下了，马上帮您走换货流程哈～'],
+      ],
+    },
+    {
+      so: 8, channel: 'im', scenario: 'negotiate', tpl: negTplId, status: 'achieved', outcome: 'no_deal',
+      remark: '只能补券不打款', baseTime: '2026-05-19 14:40:00',
+      summary: { headline: '消费者拒绝优惠券方案，已登记反馈', consumer_need: '想直接退款，不接受只给券', summary_text: '消费者冲动消费想退款，但商家备注只能补券不能打款，消费者坚持要现金退款拒绝优惠券，沟通未达成，已登记反馈待专员跟进。', negotiation_steps: ['第1步：AI提出¥10、¥20优惠券方案', '第2步：消费者拒绝，坚持要现金退款', '第3步：AI说明只能发券，消费者不接受，登记反馈'], outcome: 'no_deal', deal_detail: '', next_action: '⚠️ 需人工评估是否可现金退款', engine: 'llm' },
+      msgs: [
+        ['ai', '您好呀，我是售后助理小棠，您牙刷的售后我来帮您处理～这样，我可以给您发一张¥20的店铺优惠券，您看行吗？'],
+        ['consumer', '我不要券，我要直接退钱'],
+        ['ai', '理解您，不过这单按规则只能用优惠券补偿，没法直接打款呢。¥20券下次买东西能直接抵，您看？'],
+        ['consumer', '那不行，我就要退款'],
+        ['ai', '好的，那我先把您的情况详细登记下来反馈给专员，后续会有人再跟您联系，您留意下哈。'],
+      ],
+    },
+  ];
+
+  for (const d of demos) {
+    db.run(`INSERT INTO ai_sessions (service_order_id,template_id,channel,scenario,merchant_remark,status,stage,rounds,proposal_step,outcome,outcome_detail,summary,started_at,ended_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [d.so, d.tpl, d.channel, d.scenario, d.remark, d.status, 'closing', d.msgs.length, 2, d.outcome, d.summary.deal_detail || '', JSON.stringify(d.summary), d.baseTime, d.baseTime]);
+    const sid = query('SELECT id FROM ai_sessions ORDER BY id DESC LIMIT 1')[0].id;
+    let t = new Date(d.baseTime.replace(' ', 'T') + '+08:00').getTime();
+    for (const [role, content] of d.msgs) {
+      const ts = new Date(t).toISOString().replace('T', ' ').slice(0, 19);
+      db.run('INSERT INTO ai_messages (session_id,role,content,intent,created_at) VALUES (?,?,?,?,?)',
+        [sid, role, content, role === 'ai' ? 'propose' : '', ts]);
+      t += 25000; // 每轮间隔约 25s
+    }
+  }
 }
 
 function saveDb() {
@@ -217,6 +401,58 @@ function seedData() {
   db.run('UPDATE service_orders SET merchant_remark=\'商品已拆封使用，不符合退货条件\' WHERE id=4');
   db.run('UPDATE service_orders SET merchant_remark=\'请提供购买凭证和故障照片\' WHERE id=5');
   db.run('UPDATE service_orders SET merchant_remark=\'同意全额退款\' WHERE id=6');
+
+  seedMorePending();
+}
+
+// 补充更多待审核服务单（保证演示时待审核 >=10 条）
+function seedMorePending() {
+  // 追加订单（consumer_id 取已有 1-5）
+  const moreOrders = [
+    ['ORD20260511011', 2, 'Bose QC45 头戴耳机', 'https://picsum.photos/seed/boseqc45/200', 2299.00, 1, '2026-05-11 09:10:00'],
+    ['ORD20260512012', 3, 'Nike 运动卫衣 L码', 'https://picsum.photos/seed/nikehoodie/200', 459.00, 1, '2026-05-12 10:20:00'],
+    ['ORD20260513013', 5, '美的电饭煲 4L', 'https://picsum.photos/seed/midea4l/200', 329.00, 1, '2026-05-13 11:30:00'],
+    ['ORD20260514014', 4, '罗技 MX Master 3S 鼠标', 'https://picsum.photos/seed/mxmaster/200', 699.00, 1, '2026-05-14 13:40:00'],
+    ['ORD20260515015', 1, '兰蔻菁纯面霜 50ml', 'https://picsum.photos/seed/lancome/200', 1280.00, 1, '2026-05-15 15:50:00'],
+    ['ORD20260516016', 2, 'Switch OLED 游戏机', 'https://picsum.photos/seed/switcholed/200', 2099.00, 1, '2026-05-16 16:00:00'],
+    ['ORD20260517017', 3, 'Adidas 跑鞋 41码', 'https://picsum.photos/seed/adidasrun/200', 599.00, 1, '2026-05-17 09:25:00'],
+    ['ORD20260518018', 5, '九阳破壁机 Y88', 'https://picsum.photos/seed/joyoung/200', 899.00, 1, '2026-05-18 10:35:00'],
+    ['ORD20260519019', 4, 'Kindle Paperwhite 6.8寸', 'https://picsum.photos/seed/kindle/200', 1099.00, 1, '2026-05-19 14:45:00'],
+    ['ORD20260520020', 1, 'SK-II 神仙水 230ml', 'https://picsum.photos/seed/skii/200', 1540.00, 1, '2026-05-20 15:55:00'],
+  ];
+  for (const o of moreOrders) {
+    db.run('INSERT INTO orders (order_no,consumer_id,product_name,product_image,price,quantity,created_at) VALUES (?,?,?,?,?,?,?)', o);
+  }
+  // 取这些订单的自增 id
+  const moreNos = moreOrders.map(o => o[0]);
+  const placeholders = moreNos.map(() => '?').join(',');
+  const ordIds = query(`SELECT id, consumer_id FROM orders WHERE order_no IN (${placeholders}) ORDER BY id ASC`, moreNos);
+  const pendings = [
+    ['return', '商品质量问题', '耳机右耳无声，疑似喇叭故障', 'high', 2299.00],
+    ['exchange', '尺码不合适', 'L码偏小，想换XL', 'normal', 0],
+    ['refund_only', '商品与描述不符', '内胆涂层有划痕，和详情页不一样', 'normal', 329.00],
+    ['repair', '使用故障', '鼠标连接经常断连', 'normal', 0],
+    ['return', '商品质量问题', '面霜膏体有分层，疑似变质', 'high', 1280.00],
+    ['return', '七天无理由', '买重复了想退一台', 'low', 2099.00],
+    ['exchange', '尺码不合适', '41码偏大半码，想换40.5', 'normal', 0],
+    ['repair', '使用故障', '破壁机加热档位失灵', 'normal', 0],
+    ['refund_only', '不想要了', '看了一周没怎么用想退', 'low', 1099.00],
+    ['return', '商品质量问题', '瓶口漏液，收到时盒子已渗出', 'urgent', 1540.00],
+  ];
+  let n = 1;
+  for (let i = 0; i < ordIds.length && i < pendings.length; i++) {
+    const o = ordIds[i];
+    const p = pendings[i];
+    const created = `2026-05-${String(20 + Math.floor(i / 3)).padStart(2, '0')} ${String(9 + i).padStart(2, '0')}:15:00`;
+    const svNo = 'SV2026052' + String(100 + n).slice(1);
+    db.run(`INSERT INTO service_orders (service_no,consumer_id,order_id,type,reason,description,status,sub_status,priority,refund_amount,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [svNo, o.consumer_id, o.id, p[0], p[1], p[2], 'pending', null, p[3], p[4], created, created]);
+    const soId = query('SELECT id FROM service_orders ORDER BY id DESC LIMIT 1')[0].id;
+    db.run('INSERT INTO service_timeline (service_order_id,event_type,title,description,operator,created_at) VALUES (?,?,?,?,?,?)',
+      [soId, 'created', '提交售后申请', '消费者提交了售后申请', '消费者', created]);
+    n++;
+  }
 }
 
 module.exports = { getDb, saveDb, query, run };

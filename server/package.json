@@ -7,8 +7,11 @@
     "dev": "node --watch index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.21.0",
+    "msedge-tts": "^2.0.5",
     "sql.js": "^1.11.0"
   }
 }

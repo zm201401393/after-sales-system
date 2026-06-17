@@ -11,6 +11,15 @@
     </div>
 
     <template v-if="detail">
+      <!-- AI 协商助理（顶部突出位置，可折叠） -->
+      <AINegotiation
+        :service-order-id="detail.id"
+        :consumer-phone="detail.buyer_phone || ''"
+        :consumer-name="detail.buyer_name || ''"
+        :default-expanded="false"
+        ref="aiNegotiationRef"
+      />
+
       <div class="detail-grid">
         <div class="left-col">
           <!-- 服务单信息 -->
@@ -291,6 +300,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useServiceOrderStore } from '@/stores/serviceOrder'
 import dayjs from 'dayjs'
+import AINegotiation from '@/components/AINegotiation.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -303,6 +313,12 @@ const logisticsLoading = ref(false)
 const adoptLoading = ref(false)
 const sendingMessage = ref(false)
 const acting = ref(false)
+const aiNegotiationRef = ref(null)
+
+async function reloadCommunications() {
+  try { const res = await store.fetchCommunications(route.params.id); communications.value = Array.isArray(res) ? res : (res?.list || []) }
+  catch (e) { console.error(e) }
+}
 
 const detail = computed(() => store.detail)
 const aiSuggestion = ref(null)

@@ -48,6 +48,13 @@
       </div>
     </div>
 
+    <div class="ai-capability-hint">
+      <span class="ach-icon">✨</span>
+      <span class="ach-text">
+        <strong>AI 提效：</strong>待审核单可一键获取 <b>AI 审核建议</b>（通过/拒绝/待反馈+理由）；进入详情还能发起 <b>AI 协商</b>（智能外呼 / 在线会话托管），自动与消费者沟通方案并转人工。
+      </span>
+    </div>
+
     <div class="batch-bar" v-if="selectedRows.length > 0">
       <span class="batch-info">已选择 <strong>{{ selectedRows.length }}</strong> 项</span>
       <el-button type="success" size="small" @click="handleBatchApprove">批量通过</el-button>
@@ -318,6 +325,22 @@ function handleBatchReject() {
 }
 
 .batch-info { font-size: 13px; color: #3b82f6; }
+
+.ai-capability-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #eff6ff 100%);
+  border: 1px solid #ddd6fe;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475569;
+}
+.ach-icon { font-size: 14px; flex-shrink: 0; }
+.ai-capability-hint strong { color: #6d28d9; }
+.ai-capability-hint b { color: #4f46e5; font-weight: 600; }
 
 .table-card {
   background: #fff;

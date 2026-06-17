@@ -24,6 +24,12 @@ const routes = [
     meta: { title: '服务单详情' }
   },
   {
+    path: '/merchant/ai-templates',
+    name: 'AITemplates',
+    component: () => import('../views/merchant/AITemplates.vue'),
+    meta: { title: '协商agent管理' }
+  },
+  {
     path: '/consumer/apply',
     name: 'ApplyService',
     component: () => import('../views/consumer/ApplyService.vue'),

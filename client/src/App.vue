@@ -49,6 +49,7 @@ const route = useRoute()
 const menuItems = [
   { path: '/merchant/dashboard', label: '工作台', icon: '◉' },
   { path: '/merchant/service-list', label: '服务单管理', icon: '◎' },
+  { path: '/merchant/ai-templates', label: '协商agent管理', icon: '✦' },
   { path: '/consumer/apply', label: '消费者申请', icon: '✎' },
   { path: '/consumer/my-services', label: '我的售后', icon: '◈' }
 ]
