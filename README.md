@@ -1,23 +1,92 @@
 # 售后服务平台
 
-电商售后服务管理系统，提供商家端工单处理和消费者端售后申请的完整流程管理，内置 AI 智能审核建议功能。
+电商售后服务管理系统，提供商家端工单处理和消费者端售后申请的完整流程管理。内置 **AI 智能审核建议** 与 **AI 协商助理**（智能外呼 + 在线会话托管），由大模型驱动、规则引擎兜底，帮助商家自动与消费者沟通售后方案。
+
+> 在线演示：https://after-sales-system-production.up.railway.app
 
 ## 功能模块
 
 ### 商家端
 
 - **工作台**：售后工单统计概览（各状态数量、优先级分布）
-- **服务单管理**：工单列表查询、筛选（状态/类型/优先级/日期/关键词）、分页
+- **服务单管理**：工单列表查询、筛选（状态/类型/优先级/日期/关键词）、分页；列表内联展示 AI 审核建议
 - **工单详情**：查看完整工单信息、消费者画像、沟通记录、物流追踪、操作时间线
-- **工单处理**：审核通过、拒绝、要求补充信息、标记完成
-- **批量操作**：批量通过/拒绝
-- **AI 审核建议**：基于消费者信用、VIP等级、退货率、工单类型等多维度自动生成处理建议
+- **工单处理**：审核通过、拒绝、要求补充信息、标记完成；批量通过/拒绝
+- **AI 审核建议**：基于消费者信用、VIP 等级、退货率、工单类型等多维度自动生成处理建议
+- **AI 协商助理**（核心能力）：在工单详情内一键发起 AI 协商，替商家与消费者多轮沟通售后方案（详见下方 [AI 协商助理](#ai-协商助理-) 章节）
+- **协商 agent 管理**：配置 AI 协商 agent 的人设、语气、可用方案、让步阶梯、转人工关键词；内置 AI 协商数据分析
 
 ### 消费者端
 
 - **售后申请**：选择订单，提交退货/换货/维修/仅退款申请
 - **我的售后**：查看个人售后单状态及历史记录
 - **满意度评价**：对已完成的服务单进行评分和评价
+
+## AI 协商助理 ⭐
+
+AI 协商助理是本系统的核心能力。传统售后中，商家客服要为每一单反复打电话、回消息、讨价还价，人力成本高、响应慢、口径不一。AI 协商助理把这部分工作自动化：商家只需在工单上配置「能给什么、最多给多少」，AI 就以拟人的语气替商家与消费者多轮沟通，在授权范围内达成方案、问清原因，谈不拢时体面地转人工——全程守住商家底线，并沉淀可复盘的数据。
+
+### 解决什么问题
+
+- **省人力**：高频、低复杂度的售后沟通（小额补偿协商、原因澄清）由 AI 接管，客服只处理真正需要人工的疑难单
+- **响应快**：消费者随时发起，AI 秒级响应，不受客服在线时间限制
+- **口径稳**：方案范围、金额上限、让步节奏由模板统一约束，不会出现客服私自超额承诺
+- **可沉淀**：每次协商自动生成结论与过程记录，并汇总成数据分析，便于商家评估与优化话术
+
+### 两种渠道 × 两种场景
+
+| 维度 | 选项 | 说明 |
+|------|------|------|
+| 渠道 | **智能外呼** | 浏览器模拟电话：云端神经语音（TTS）播报 + 浏览器语音识别（STT）听取。支持消费者**打断**正在说话的 AI、在 AI **思考时补充**信息、**冷场主动跟进**、一键**转人工**；通话结束自动生成总结 |
+| 渠道 | **在线会话托管** | 文字会话。消费者可**上传图片**，AI 结合申请原因**核验图片真实性**再决定方案；消息即时上屏、自动滚动、思考中可继续补充 |
+| 场景 | **方案协商** | 在商家授权的方案与金额上限内，循序渐进报价、让步，达成双方都能接受的方案 |
+| 场景 | **原因澄清** | 当消费者填写的售后原因不清晰（如"东西不好"）时，2-4 轮追问问清问题点、发生时间与证据 |
+
+### 一次协商的完整流程
+
+```
+商家在工单详情「发起 AI 协商」
+   │  选择渠道(外呼/会话)、场景(协商/澄清)、agent 模板、本次特别备注(如"最多补20")
+   ▼
+AI 生成开场白(结合商品名、申请原因，认得这一单的来龙去脉)
+   ▼
+多轮对话：
+   ├─ 消费者抱怨/提诉求 → AI 先共情、再按让步阶梯报方案
+   ├─ 消费者嫌少/拒绝   → AI 升档让步(但绝不超过商家死线)
+   ├─ 消费者选定方案     → AI 立即确认成交，不再追问
+   ├─ 消费者发图片(会话) → AI 核验真实性，与申请原因比对后决定
+   └─ 消费者情绪激动/要投诉/谈不拢 → AI 安抚并转人工 或 登记反馈
+   ▼
+结束 → 自动生成会话总结(诉求 / 协商过程 / 结论 / 商家待办)
+   ▼
+数据沉淀到「协商 agent 管理」的数据分析模块
+```
+
+### 关键能力设计
+
+- **商家授权与死线约束**：每个 agent 模板配置可用方案（打款/优惠券/补发/换货）、打款上限、优惠券面额、最大轮次、转人工关键词。商家还能在发起时填「本次特别备注」（如"最多补20，不接受换货"），该备注作为**最高优先级红线**注入，AI **绝不突破金额上限**——到顶仍谈不拢就转人工/登记，宁可不成交也不超线。
+- **拟人化让步策略**：先报最低档（如 ¥10 券或小额打款），消费者嫌少再升档，最后到上限；报价时给"理由"（"我帮您申请了下""跟主管商量过"），让消费者感到被争取，而不是机械抛价。
+- **精准意图识别**：能区分消费者是**接受**（"打款吧""可以""第二个"）、**拒绝某方案**（"不想要优惠券"→ 改推打款，绝不再塞券）、**要求人工**、**情绪激动**还是**在提供澄清信息**，据此推进而非答非所问。
+- **图片真实性核验**（在线会话）：消费者上传的图片会与「申请原因/描述」一起送给多模态大模型，判断图片反映的问题是否与申请相符、是否可疑（摆拍、与商品无关、与描述矛盾），据此决定是否推进方案或请消费者补充。
+- **拟人语音体验**（智能外呼）：云端神经语音音色自然；消费者一开口即打断 AI 播报；AI 思考时消费者可继续补充、自动合并进下一轮；冷场会主动跟进；一句话被多段识别会自动合并去重。
+- **会话总结**：协商结束自动生成结构化结论——消费者真实诉求、**完整协商过程**（报过哪几种方案、拒绝了哪些、最终接受哪个）、达成方案、商家待办，便于商家不看记录也能复盘。
+
+### 大模型 + 规则引擎双层架构（高可用）
+
+AI 协商采用「大模型驱动 + 规则引擎兜底」的双层设计，保证**任何情况下对话都不中断、不卡顿**：
+
+- **优先大模型**：调用 GLM-5.1（OpenAI 兼容网关）。对话场景关闭推理模式以提速，并设**时延硬上限**（外呼 5s / 在线会话 6s）。
+- **自动降级规则引擎**：当未配置 Key、网关限流（429）或超时，立即降级到内置规则引擎。规则引擎同样能共情、按阶梯报价让步、识别"打款/券/不要券"等表达并正确成交——降级时体验与大模型接近，绝不会出现报错、白屏或长时间干等。
+- **多模型路径分工**：外呼/会话求快（关推理、低 token、不重试，超时即兜底）；图片核验求准（开多模态、放宽超时）；会话总结求全（结构化输出协商全过程）。
+
+### 数据分析
+
+「协商 agent 管理」页内置 AI 协商数据效果分析：
+
+- 使用 AI 协商的服务单数、协商总次数
+- 沟通渠道占比（智能外呼 vs 在线会话）
+- 协商成功率，按场景拆分（方案协商=消费者接受方案；原因澄清=完整获取到信息）
+- 未达成原因下钻（诉求超 AI 权限需人工 / 方案未谈拢 / 其他），辅助商家判断是话术问题还是 agent 配置问题
 
 ## 技术栈
 
@@ -28,39 +97,44 @@
 | 图表 | ECharts + vue-echarts |
 | 构建工具 | Vite 6 |
 | 后端框架 | Express |
-| 数据库 | sql.js（SQLite in-memory，文件持久化） |
+| 数据库 | sql.js（SQLite，文件持久化） |
+| 大模型 | GLM-5.1（OpenAI 兼容网关，可配置） |
+| 语音 | 云端神经 TTS（msedge-tts）+ 浏览器 Web Speech API（STT/兜底 TTS） |
 | HTTP 客户端 | Axios |
 
 ## 项目结构
 
 ```
 after-sales-system/
-├── client/                   # 前端
+├── client/                       # 前端
 │   ├── src/
 │   │   ├── views/
-│   │   │   ├── merchant/     # 商家端页面（Dashboard, ServiceList, ServiceDetail）
-│   │   │   └── consumer/     # 消费者端页面（ApplyService, MyServices）
-│   │   ├── router/           # 路由配置
-│   │   ├── stores/           # Pinia 状态管理
-│   │   ├── components/       # 公共组件
-│   │   ├── App.vue           # 主布局
-│   │   └── main.js           # 入口
-│   ├── vite.config.js
+│   │   │   ├── merchant/         # 商家端（Dashboard, ServiceList, ServiceDetail, AITemplates）
+│   │   │   └── consumer/         # 消费者端（ApplyService, MyServices）
+│   │   ├── components/
+│   │   │   ├── AINegotiation.vue # AI 协商助理面板（会话/总结/发起）
+│   │   │   └── PhoneCall.vue     # 智能外呼通话界面（TTS/STT/打断/转人工）
+│   │   ├── router/ stores/ App.vue main.js
+│   │   └── ...
+│   ├── dist/                     # 预构建前端产物（生产环境由后端托管）
 │   └── package.json
-├── server/                   # 后端
+├── server/                       # 后端
 │   ├── routes/
-│   │   ├── serviceOrders.js  # 售后工单 CRUD 及状态流转
-│   │   ├── orders.js         # 订单查询
-│   │   ├── consumers.js      # 消费者信息
-│   │   └── communications.js # 沟通记录
+│   │   ├── serviceOrders.js      # 售后工单 CRUD 及状态流转
+│   │   ├── orders.js consumers.js communications.js
+│   │   ├── aiTemplates.js        # 协商 agent 模板 CRUD
+│   │   └── aiSessions.js         # AI 协商会话：发起/回复/总结/转人工/TTS/数据分析
 │   ├── services/
-│   │   └── aiSuggestion.js   # AI 审核建议引擎
-│   ├── db.js                 # 数据库初始化及种子数据
-│   ├── index.js              # 服务入口
+│   │   ├── aiSuggestion.js       # AI 审核建议引擎
+│   │   ├── aiAgent.js            # AI 协商 Agent（大模型调用 + 规则兜底 + 总结）
+│   │   └── tts.js                # 云端神经语音合成
+│   ├── db.js                     # 数据库初始化及种子数据
+│   ├── index.js                  # 服务入口
+│   ├── .env.example              # 环境变量模板
 │   └── package.json
-├── render.yaml               # Render 部署配置
-├── railway.json              # Railway 部署配置
-└── package.json              # 根级脚本
+├── render.yaml                   # Render 部署配置
+├── railway.json                  # Railway 部署配置
+└── package.json                  # 根级脚本
 ```
 
 ## 快速开始
@@ -69,7 +143,26 @@ after-sales-system/
 
 - Node.js >= 18
 
-### 本地开发
+### 1. 配置大模型（可选但推荐）
+
+复制环境变量模板并填入大模型网关信息：
+
+```bash
+cd server
+cp .env.example .env
+```
+
+编辑 `server/.env`：
+
+```ini
+AI_API_KEY=你的API_Key          # 大模型网关 Key；不配则全程走规则引擎
+AI_BASE_URL=http://ai-api.jdcloud.com/v1   # OpenAI 兼容网关地址（/v1 结尾）
+AI_MODEL=GLM-5.1                 # 模型名
+```
+
+> 不配置 `AI_API_KEY` 时系统仍可运行，AI 协商会自动使用规则引擎。
+
+### 2. 本地开发
 
 ```bash
 # 安装依赖
@@ -77,45 +170,68 @@ cd client && npm install
 cd ../server && npm install
 
 # 启动后端（端口 3000）
-cd server
-npm run dev
+cd server && npm run dev
 
 # 启动前端（端口 5173，自动代理 /api 到后端）
-cd client
-npm run dev
+cd client && npm run dev
 ```
 
 浏览器访问 http://localhost:5173
 
-### 生产构建
+### 3. 生产构建
 
 ```bash
-cd client && npm run build
-cd ../server && npm start
+cd client && npm run build      # 构建前端到 client/dist
+cd ../server && npm start       # 启动后端，托管 client/dist
 ```
 
 构建后前端静态文件由 Express 托管，统一通过 http://localhost:3000 访问。
 
+## 环境变量
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `AI_API_KEY` | 否 | 空 | 大模型网关 Key，为空则走规则引擎 |
+| `AI_BASE_URL` | 否 | `http://ai-api.jdcloud.com/v1` | OpenAI 兼容网关地址 |
+| `AI_MODEL` | 否 | `GLM-5.1` | 模型名 |
+| `PORT` | 否 | `3000` | 后端监听端口（部署平台通常自动注入） |
+| `TTS_VOICE` | 否 | `zh-CN-XiaoxiaoNeural` | 外呼神经语音音色 |
+
 ## API 概览
+
+### 售后工单
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/service-orders/stats` | 工单统计 |
-| GET | `/api/service-orders` | 工单列表（支持筛选分页） |
+| GET | `/api/service-orders` | 工单列表（筛选分页） |
 | GET | `/api/service-orders/:id` | 工单详情 |
 | POST | `/api/service-orders` | 创建售后单 |
-| PUT | `/api/service-orders/:id/approve` | 审核通过 |
-| PUT | `/api/service-orders/:id/reject` | 审核拒绝 |
-| PUT | `/api/service-orders/:id/feedback` | 要求补充信息 |
-| PUT | `/api/service-orders/:id/complete` | 标记完成 |
-| PUT | `/api/service-orders/:id/rate` | 满意度评价 |
-| POST | `/api/service-orders/batch-approve` | 批量通过 |
-| POST | `/api/service-orders/batch-reject` | 批量拒绝 |
-| GET | `/api/service-orders/:id/ai-suggestion` | AI 审核建议 |
-| GET | `/api/orders` | 订单列表 |
-| GET | `/api/consumers` | 消费者列表 |
-| GET | `/api/service-orders/:id/communications` | 沟通记录 |
-| POST | `/api/service-orders/:id/communications` | 发送消息 |
+| PUT | `/api/service-orders/:id/approve` `/reject` `/feedback` `/complete` `/rate` | 状态流转 |
+| POST | `/api/service-orders/batch-approve` `/batch-reject` | 批量操作 |
+| POST | `/api/service-orders/batch-ai-suggestions` | 批量获取 AI 审核建议 |
+| GET/POST | `/api/service-orders/:id/communications` | 沟通记录 |
+
+### AI 协商 agent 模板
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/ai-templates` | agent 模板列表 |
+| GET/POST/PUT/DELETE | `/api/ai-templates(/:id)` | 模板增删改查 |
+
+### AI 协商会话
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/ai-sessions/engine-status` | 大模型接入状态 |
+| GET | `/api/ai-sessions/stats` | AI 协商数据分析 |
+| POST | `/api/ai-sessions/start` | 发起协商（返回开场白） |
+| POST | `/api/ai-sessions/:id/reply` | 消费者回复 → AI 应答（支持图片） |
+| POST | `/api/ai-sessions/:id/takeover` | 人工接管 / 结束会话 |
+| POST | `/api/ai-sessions/:id/summarize` | 生成会话总结 |
+| POST | `/api/ai-sessions/tts` | 神经语音合成（外呼用） |
+| GET | `/api/ai-sessions/by-service/:soId` | 某工单的协商会话列表 |
+| GET | `/api/ai-sessions/:id` | 会话详情 |
 
 ## 工单状态流转
 
@@ -130,9 +246,11 @@ pending（待审核）
 
 项目已配置 Render 和 Railway 一键部署：
 
+- **Railway**：连接 GitHub 仓库的 `master` 分支后，在服务的 **Variables** 中配置 `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL`，触发 Deploy 即可。配置见 `railway.json`
 - **Render**：推送代码后自动构建部署，配置见 `render.yaml`
-- **Railway**：配置见 `railway.json`
+
+> 生产环境前端由后端托管，仓库内已包含预构建的 `client/dist`。修改前端后需 `npm run build` 重新构建并提交。
 
 ## 数据说明
 
-首次启动时自动创建 SQLite 数据库（`server/data.db`）并注入演示数据，包含 5 个消费者、10 个订单、8 个售后工单及相关沟通记录和物流信息。
+首次启动时自动创建 SQLite 数据库（`server/data.db`）并注入演示数据：消费者、订单、**13+ 条待审核售后工单**，以及覆盖成交/转人工/原因澄清/未达成四种结局的 AI 协商演示会话（含完整对话记录与总结），用于直接体验 AI 能力。删除 `data.db` 后重启会重新生成。
