@@ -144,15 +144,15 @@
             </div>
           </div>
           <div class="reply-row">
-            <button class="img-btn" :disabled="generating" @click="triggerUpload" title="模拟消费者发送图片">🖼️</button>
+            <button class="img-btn" @click="triggerUpload" title="模拟消费者发送图片">🖼️</button>
             <input ref="fileInput" type="file" accept="image/*" multiple style="display:none" @change="onPickImages" />
             <input
               v-model="replyText"
-              placeholder="输入消费者会回复的内容（模拟）..."
+              placeholder="输入消费者会回复的内容（思考中也可继续补充）..."
               @keyup.enter="sendReply()"
               class="reply-textbox"
             />
-            <button class="send-btn" :disabled="(!replyText.trim() && !pendingImages.length) || generating" @click="sendReply()">发送给AI</button>
+            <button class="send-btn" :disabled="!replyText.trim() && !pendingImages.length" @click="sendReply()">发送给AI</button>
           </div>
         </div>
       </div>
@@ -576,17 +576,26 @@ async function autoEndRunningVoiceOnLeave() {
 }
 
 async function sendReply(text) {
-  if (generating.value) return  // 防并发：生成中再次点击/回车/快捷回复，直接忽略，避免重复发起
   const content = text || replyText.value
   const images = text ? [] : pendingImages.value.slice()
   if (!content.trim() && !images.length) return
   if (!activeSession.value) return
-  generating.value = true
   if (!text) { replyText.value = ''; pendingImages.value = [] }
-  // 乐观更新：消费者消息立即上屏，不等模型回复
+  // 乐观更新：消费者消息立即上屏
   const optimistic = { id: 'tmp-' + Date.now(), role: 'consumer', content, images: JSON.stringify(images), created_at: new Date().toISOString() }
   activeSession.value = { ...activeSession.value, messages: [...(activeSession.value.messages || []), optimistic] }
   scrollChatToBottom()
+  // AI 正在思考时允许继续补充：先攒起来，等当前这轮结束后合并发出
+  if (generating.value) {
+    imPending.push({ content, images })
+    return
+  }
+  await runReplyTurn(content, images)
+}
+
+let imPending = []
+async function runReplyTurn(content, images) {
+  generating.value = true
   try {
     const { data } = await axios.post(`/api/ai-sessions/${activeSession.value.id}/reply`, { content, images })
     activeSession.value = { ...activeSession.value, ...data.session, messages: data.messages, template: activeSession.value.template }
@@ -604,11 +613,20 @@ async function sendReply(text) {
         else ElMessage.success(`沟通结束：${statusLabel(data.session)}`)
       }
       await fetchSessions()
+      imPending = []
+      return
     }
   } catch (e) {
     ElMessage.error(e.response?.data?.error || '生成回复失败')
   } finally {
     generating.value = false
+  }
+  // 思考期间消费者又补充了 → 合并发出，做到"思考中可继续补充"
+  if (imPending.length && activeSession.value && activeSession.value.status === 'running') {
+    const merged = imPending.map(p => p.content).filter(Boolean).join('，')
+    const mergedImgs = imPending.flatMap(p => p.images || [])
+    imPending = []
+    if (merged.trim() || mergedImgs.length) await runReplyTurn(merged, mergedImgs)
   }
 }
 async function takeover() {

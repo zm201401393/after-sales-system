@@ -93,9 +93,12 @@ function detectIntent(text) {
   // 强情绪
   if (/(投诉|315|消协|律师|起诉|曝光|媒体|工商|曝你|网曝|恶心|垃圾|无良)/.test(t)) return 'anger';
   if (/(气死|生气|烦死|搞什么|我服了|无语|你们什么意思|敷衍|糊弄|应付)/.test(t)) return 'anger';
-  // 接受 / 选定某个方案（自由表达也能识别）
-  if (/(打款|要钱|退钱|现金|转账|第一个|前一个|头一个|打钱)/.test(t) && !/不(打款|要)/.test(t)) return 'accept_refund';
-  if (/(优惠券|要券|发券|第二个|后一个|那个券|用券|给券)/.test(t) && !/不(要券|用券)/.test(t)) return 'accept_coupon';
+  // 明确拒绝某种方案（"不想要券""不要优惠券""不要打款"）→ 当作拒绝，换另一种方案
+  if (/(不想要?|不要|不需要|别给我|拒绝).{0,3}(优惠券|券)/.test(t) || /(优惠券|券).{0,3}(不要|不想要|没用|没意思)/.test(t)) return 'reject_coupon';
+  if (/(不想要?|不要|不需要).{0,3}(打款|钱|现金)/.test(t)) return 'reject_refund';
+  // 接受 / 选定某个方案（自由表达也能识别；先排除否定）
+  if (!/不/.test(t.slice(0, Math.max(0, t.search(/(打款|要钱|退钱|现金|转账|打钱)/)))) && /(打款|要钱|退钱|现金|转账|第一个|前一个|头一个|打钱)/.test(t)) return 'accept_refund';
+  if (!/(不想要?|不要|不需要)/.test(t) && /(优惠券|要券|发券|第二个|后一个|那个券|用券|给券)/.test(t)) return 'accept_coupon';
   if (/^(好的?|可以|行|同意|接受|没问题|那就这样|就这样|ok|嗯好|嗯可以|成|可以的|行吧|好的可以|嗯|是|对|要|就它|就这个)[!?。！？～~。\s]*$/i.test(t)) return 'accept';
   if (/(^|[，。！？\s])(好的?|可以|行|同意|接受|可以接受|没问题|就这样|那就[选定要]|就要这个|要这个|就这个|听你的|按你说的)([。！？\s]|$)/.test(t) && !/不/.test(t)) return 'accept';
   // 拒绝
@@ -172,6 +175,11 @@ ${allow.exchange ? '- ✅ 换货' : '- ❌ 不允许换货'}
 - 消费者说"券""优惠券""第二个""要券" → 选定【优惠券】 → 立刻确认成交 ended=true, outcome="deal"
 - 消费者说"可以""行""好""同意""就这个""可以接受""听你的" → 接受当前最近方案 → 立刻确认成交 ended=true, outcome="deal"
 - 一旦确认成交，content 里只说"那就按X方案给您办，马上安排"，绝不再重复报价、绝不再问选哪个。
+
+## ⚡ 识别"拒绝某种方案"（同样重要）：
+- 消费者说"不想要优惠券""不要券""券没用" → 【绝对不要再发券】，改推打款（如允许）："好的那不发券，给您打款¥X，您看行不？"
+- 消费者说"不要打款""不想要钱" → 改推优惠券（如允许）。
+- 总之消费者明确否定哪种方案，就别再给那种，换另一种；两种都被否就转人工/登记。
 
 ## 当消费者拒绝到底（已到最高档仍不接受，或一开始就明确不接受任何方案）：
 不要再反复磨，干脆给一个明确出口，二选一灵活处理：
@@ -300,13 +308,14 @@ async function callLLM({ template, serviceOrder, session, history, lastConsumerM
   return await chatCompletion({
     system,
     messages,
-    // 带图片需大预算+推理(看图)；外呼/在线会话都关推理提速(3-5s)，预算够说完整即可
-    maxTokens: withImg ? 3000 : (isVoice ? 800 : 1000),
-    timeoutMs: withImg ? 60000 : (isVoice ? 9000 : 15000),
+    // 带图片需大预算+推理(看图)；外呼/在线会话都关推理提速，预算够说完整即可
+    maxTokens: withImg ? 3000 : (isVoice ? 800 : 900),
+    // 时延硬上限：外呼5s、在线会话6s，超时立刻走高质量规则兜底，绝不让用户干等
+    timeoutMs: withImg ? 60000 : (isVoice ? 5000 : 6000),
     disableThinking: !withImg,
-    // 外呼对时延极敏感：不重试，超时/限流立刻走高质量规则兜底，绝不让用户等
-    maxRetries: isVoice ? 0 : 2,
-    backoffBase: isVoice ? 500 : 700,
+    // 外呼/会话都对时延敏感：不重试，超时/限流立刻降级
+    maxRetries: withImg ? 1 : 0,
+    backoffBase: 500,
   });
 }
 
@@ -521,12 +530,33 @@ function fallbackReply({ session, template, serviceOrder, history = [], lastCons
 
   // 4. 协商场景
   let step = session.proposal_step || 0;
+  const ceilingVal = constraints.hardCeiling != null
+    ? constraints.hardCeiling
+    : Math.min(template.refund_ceiling || 0, productPrice * (template.refund_ratio || 0.2));
+  const couponListAll = (() => { try { return JSON.parse(template.coupon_options || '[10]').sort((a,b)=>a-b); } catch { return [10]; } })();
+  const allowRefund = !!template.allow_refund && !(constraints.exclude||[]).includes('refund');
+  const allowCoupon = !!template.allow_coupon && !(constraints.exclude||[]).includes('coupon');
+
+  // 消费者明确不要优惠券 → 改推打款（如果允许）
+  if (intent === 'reject_coupon') {
+    if (allowRefund) {
+      const amt = Math.max(Math.round(ceilingVal * 0.7), Math.round(ceilingVal * 0.4)) || Math.round(ceilingVal);
+      return { content: `好的，那优惠券就不发了哈。这样，我直接给您打款¥${Math.min(amt, Math.round(ceilingVal))}到账户，您看行不？`, intent: 'concede', stage: 'propose', proposal_step: Math.max(step, 1), ended: false };
+    }
+    return { content: '理解您不想要券。不过这单按规则只能发优惠券，没法直接打款呢。要不我帮您把情况登记给专员，看能不能特殊处理？', intent: 'close_no_deal', stage: 'closing', proposal_step: step, ended: true, outcome: 'no_deal', outcome_detail: '消费者拒绝优惠券且不可打款', summary: '消费者拒绝优惠券方案，已登记反馈' };
+  }
+  // 消费者明确不要打款 → 改推优惠券（如果允许）
+  if (intent === 'reject_refund') {
+    if (allowCoupon) {
+      const amt = couponListAll[Math.min(step + 1, couponListAll.length - 1)] || couponListAll[couponListAll.length - 1];
+      return { content: `好的，那不打款。这样我给您发一张¥${amt}的店铺优惠券，下次下单直接抵，您看可以吗？`, intent: 'concede', stage: 'propose', proposal_step: Math.max(step, 1), ended: false };
+    }
+    return { content: '明白，那这样，我帮您把情况登记给专员后续再联系您哈。', intent: 'close_no_deal', stage: 'closing', proposal_step: step, ended: true, outcome: 'no_deal', outcome_detail: '消费者拒绝打款', summary: '消费者拒绝打款方案，已登记反馈' };
+  }
 
   // 选定"打款" → 成交，明确金额
   if (intent === 'accept_refund') {
-    const ceiling = constraints.hardCeiling != null
-      ? constraints.hardCeiling
-      : Math.min(template.refund_ceiling || 0, productPrice * (template.refund_ratio || 0.2));
+    const ceiling = ceilingVal;
     const amt = Math.round(Math.min(ceiling, step === 0 ? ceiling * 0.4 : (step === 1 ? ceiling * 0.7 : ceiling)) || ceiling);
     const finalAmt = Math.max(amt, Math.round(ceiling * 0.4)) || amt;
     return {
