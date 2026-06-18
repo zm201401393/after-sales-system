@@ -300,10 +300,10 @@ async function callLLM({ template, serviceOrder, session, history, lastConsumerM
     messages,
     // 带图片需大预算+推理(看图)；外呼/在线会话都关推理提速(3-5s)，预算够说完整即可
     maxTokens: withImg ? 3000 : (isVoice ? 800 : 1000),
-    timeoutMs: withImg ? 60000 : (isVoice ? 12000 : 15000),
+    timeoutMs: withImg ? 60000 : (isVoice ? 9000 : 15000),
     disableThinking: !withImg,
-    // 外呼对时延极敏感：限流时最多快速重试1次(短退避)，否则宁可走规则兜底也不让用户等20秒
-    maxRetries: isVoice ? 1 : 2,
+    // 外呼对时延极敏感：不重试，超时/限流立刻走高质量规则兜底，绝不让用户等
+    maxRetries: isVoice ? 0 : 2,
     backoffBase: isVoice ? 500 : 700,
   });
 }
