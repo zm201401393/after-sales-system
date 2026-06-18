@@ -93,11 +93,13 @@ function detectIntent(text) {
   // 强情绪
   if (/(投诉|315|消协|律师|起诉|曝光|媒体|工商|曝你|网曝|恶心|垃圾|无良)/.test(t)) return 'anger';
   if (/(气死|生气|烦死|搞什么|我服了|无语|你们什么意思|敷衍|糊弄|应付)/.test(t)) return 'anger';
-  // 接受
-  if (/^(好的?|可以|行|同意|接受|没问题|那就这样|就这样|ok|嗯好|嗯可以|成|可以的|行吧|好的可以|嗯|是|对)[!?。！？～~。\s]*$/i.test(t)) return 'accept';
-  if (/(^|[，。！？\s])(好的?|可以|行|同意|接受|可以接受|没问题|就这样|那就[选定要]|就要这个|要这个)([。！？\s]|$)/.test(t) && !/不/.test(t)) return 'accept';
+  // 接受 / 选定某个方案（自由表达也能识别）
+  if (/(打款|要钱|退钱|现金|转账|第一个|前一个|头一个|打钱)/.test(t) && !/不(打款|要)/.test(t)) return 'accept_refund';
+  if (/(优惠券|要券|发券|第二个|后一个|那个券|用券|给券)/.test(t) && !/不(要券|用券)/.test(t)) return 'accept_coupon';
+  if (/^(好的?|可以|行|同意|接受|没问题|那就这样|就这样|ok|嗯好|嗯可以|成|可以的|行吧|好的可以|嗯|是|对|要|就它|就这个)[!?。！？～~。\s]*$/i.test(t)) return 'accept';
+  if (/(^|[，。！？\s])(好的?|可以|行|同意|接受|可以接受|没问题|就这样|那就[选定要]|就要这个|要这个|就这个|听你的|按你说的)([。！？\s]|$)/.test(t) && !/不/.test(t)) return 'accept';
   // 拒绝
-  if (/(不行|不可以|不接受|不同意|不要|不够|太少|怎么这么少|这点钱|开玩笑|不能接受|拒绝|不满意)/.test(t)) return 'reject';
+  if (/(不行|不可以|不接受|不同意|不要|不够|太少|怎么这么少|这点钱|开玩笑|不能接受|拒绝|不满意|再多|多点|加点)/.test(t)) return 'reject';
   // 提供详细信息
   if (t.length >= 10 && /(因为|是因为|具体是|问题是|当时|收到|发现|拍照|拍了|看到|图片|照片|视频|前天|昨天|今天|刚|有[一一]|出现)/.test(t)) return 'clarify_provided';
   // 提问
@@ -520,7 +522,33 @@ function fallbackReply({ session, template, serviceOrder, history = [], lastCons
   // 4. 协商场景
   let step = session.proposal_step || 0;
 
-  // 接受 → 收尾
+  // 选定"打款" → 成交，明确金额
+  if (intent === 'accept_refund') {
+    const ceiling = constraints.hardCeiling != null
+      ? constraints.hardCeiling
+      : Math.min(template.refund_ceiling || 0, productPrice * (template.refund_ratio || 0.2));
+    const amt = Math.round(Math.min(ceiling, step === 0 ? ceiling * 0.4 : (step === 1 ? ceiling * 0.7 : ceiling)) || ceiling);
+    const finalAmt = Math.max(amt, Math.round(ceiling * 0.4)) || amt;
+    return {
+      content: `好嘞，那就给您打款¥${finalAmt}，原路退到您账户，我这就去帮您安排，到账留意下哈，有问题随时找我～`,
+      intent: 'close_deal', stage: 'closing', proposal_step: step,
+      ended: true, outcome: 'deal', outcome_detail: `打款¥${finalAmt}`,
+      summary: `消费者选定打款方案，金额¥${finalAmt}`
+    };
+  }
+  // 选定"优惠券" → 成交，明确面额
+  if (intent === 'accept_coupon') {
+    const couponList = (() => { try { return JSON.parse(template.coupon_options || '[10]').sort((a,b)=>a-b); } catch { return [10]; } })();
+    const amt = couponList[Math.min(step, couponList.length - 1)] || couponList[0] || 10;
+    return {
+      content: `好嘞，那就给您发一张¥${amt}的店铺优惠券，马上到您账户，下次下单直接抵用哈，有问题随时找我～`,
+      intent: 'close_deal', stage: 'closing', proposal_step: step,
+      ended: true, outcome: 'deal', outcome_detail: `¥${amt}优惠券`,
+      summary: `消费者选定优惠券方案，面额¥${amt}`
+    };
+  }
+
+  // 接受（笼统的"可以/行"）→ 收尾
   if (intent === 'accept') {
     const proposal = buildProposal(template, constraints, step, productPrice);
     const dealText = proposal.join('；');
