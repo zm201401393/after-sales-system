@@ -15,7 +15,7 @@ const MAX_RETRIES = Number(process.env.AI_MAX_RETRIES) || 3;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* 统一的 OpenAI 兼容 Chat Completions 调用（含 429 限流退避重试） */
-async function chatCompletion({ system, messages, maxTokens = MAX_TOKENS, timeoutMs = TIMEOUT_MS, disableThinking = false }) {
+async function chatCompletion({ system, messages, maxTokens = MAX_TOKENS, timeoutMs = TIMEOUT_MS, disableThinking = false, maxRetries = MAX_RETRIES, backoffBase = 800 }) {
   if (!AI_API_KEY) return null;
   const body = {
     model: MODEL,
@@ -26,7 +26,7 @@ async function chatCompletion({ system, messages, maxTokens = MAX_TOKENS, timeou
   if (disableThinking) body.chat_template_kwargs = { enable_thinking: false };
 
   let lastErr = null;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     let resp;
@@ -43,15 +43,15 @@ async function chatCompletion({ system, messages, maxTokens = MAX_TOKENS, timeou
     } catch (e) {
       lastErr = e;
       // 网络错误/超时：退避后重试
-      if (attempt < MAX_RETRIES) { await sleep(400 * Math.pow(2, attempt)); continue; }
+      if (attempt < maxRetries) { await sleep(backoffBase * Math.pow(2, attempt)); continue; }
       throw e;
     } finally {
       clearTimeout(timer);
     }
 
     // 限流：指数退避后重试
-    if (resp.status === 429 && attempt < MAX_RETRIES) {
-      const wait = 800 * Math.pow(2, attempt);
+    if (resp.status === 429 && attempt < maxRetries) {
+      const wait = backoffBase * Math.pow(2, attempt);
       console.warn(`[aiAgent] 429 限流，第 ${attempt + 1} 次退避 ${wait}ms 后重试`);
       await sleep(wait);
       continue;
@@ -163,6 +163,13 @@ ${allow.exchange ? '- ✅ 换货' : '- ❌ 不允许换货'}
 - 最后一档：上限 ¥${Math.round(ceiling)}
 - 不要一次性把所有方案抛出来，循序渐进
 - 报价时说出"为什么是这个数"或者用一些理由（"我帮您申请了下""我跟主管商量过"），让消费者觉得你在为他争取
+
+## ⚡ 识别"接受方案"（极其重要，必须做对）：
+当你给了几个方案（如"打款"和"优惠券"）让消费者二选一，只要消费者说出其中一个的关键词，就是【已选定/接受】，必须立刻收尾确认，【绝对不要再问"您要哪个"】：
+- 消费者说"打款""要钱""退钱""第一个""打款吧""现金" → 选定【打款】方案 → 立刻确认："好嘞，那就给您打款¥X，马上安排～" ended=true, outcome="deal"
+- 消费者说"券""优惠券""第二个""要券" → 选定【优惠券】 → 立刻确认成交 ended=true, outcome="deal"
+- 消费者说"可以""行""好""同意""就这个""可以接受""听你的" → 接受当前最近方案 → 立刻确认成交 ended=true, outcome="deal"
+- 一旦确认成交，content 里只说"那就按X方案给您办，马上安排"，绝不再重复报价、绝不再问选哪个。
 
 ## 当消费者拒绝到底（已到最高档仍不接受，或一开始就明确不接受任何方案）：
 不要再反复磨，干脆给一个明确出口，二选一灵活处理：
@@ -291,10 +298,13 @@ async function callLLM({ template, serviceOrder, session, history, lastConsumerM
   return await chatCompletion({
     system,
     messages,
-    // 带图片需大预算；外呼关推理 → 回复快(3-5s)、预算适中保证说完整；在线会话保留推理保质量
-    maxTokens: withImg ? 3000 : (isVoice ? 800 : MAX_TOKENS),
-    timeoutMs: withImg ? 60000 : (isVoice ? 18000 : TIMEOUT_MS),
-    disableThinking: isVoice && !withImg,
+    // 带图片需大预算+推理(看图)；外呼/在线会话都关推理提速(3-5s)，预算够说完整即可
+    maxTokens: withImg ? 3000 : (isVoice ? 800 : 1000),
+    timeoutMs: withImg ? 60000 : (isVoice ? 12000 : 15000),
+    disableThinking: !withImg,
+    // 外呼对时延极敏感：限流时最多快速重试1次(短退避)，否则宁可走规则兜底也不让用户等20秒
+    maxRetries: isVoice ? 1 : 2,
+    backoffBase: isVoice ? 500 : 700,
   });
 }
 
@@ -687,7 +697,7 @@ async function summarizeSession({ session, template, serviceOrder, history }) {
 场景：${session.scenario === 'clarify' ? '原因澄清' : '方案协商'}
 ${session.merchant_remark ? '商家备注：' + session.merchant_remark + '\n' : ''}沟通记录：
 ${transcript}`;
-      const text = await chatCompletion({ system: sys, messages: [{ role: 'user', content: usr }], maxTokens: 1500 });
+      const text = await chatCompletion({ system: sys, messages: [{ role: 'user', content: usr }], maxTokens: 1200, disableThinking: true, timeoutMs: 15000, maxRetries: 1, backoffBase: 500 });
       const parsed = tryParseJSON(text);
       if (parsed && parsed.headline) return { ...parsed, engine: 'llm' };
     } catch (e) {

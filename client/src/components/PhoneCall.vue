@@ -641,7 +641,17 @@ function toggleMute() {
 }
 
 async function hangup() {
+  const sid = sessionId.value
   endCall(false)
+  // 挂断即代表通话结束：通知后端结束会话 + 触发总结，避免再回到面板还显示"进行中"
+  if (sid) {
+    try {
+      await axios.post(`/api/ai-sessions/${sid}/takeover`)
+      finalOutcome.value = finalOutcome.value || 'handoff'
+      axios.post(`/api/ai-sessions/${sid}/summarize`).then(({ data: s }) => { summaryDetail.value = s }).catch(() => {})
+    } catch {}
+    emit('ended', { session_id: sid })
+  }
 }
 
 function endCall(serverEnded) {

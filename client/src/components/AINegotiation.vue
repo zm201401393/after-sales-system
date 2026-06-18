@@ -183,8 +183,8 @@
           </el-radio-group>
         </div>
         <div class="form-row">
-          <label>使用模板</label>
-          <el-select v-model="form.template_id" placeholder="选择模板（默认使用对应场景的默认模板）" style="width: 100%;" clearable>
+          <label>选择 agent 模版</label>
+          <el-select v-model="form.template_id" placeholder="选择 agent 模版（默认使用对应场景的默认 agent）" style="width: 100%;" clearable>
             <el-option
               v-for="t in templateOptions"
               :key="t.id"
@@ -324,6 +324,9 @@ watch(() => props.consumerPhone, v => { if (v && !form.value.phone) form.value.p
 const templateOptions = computed(() =>
   templates.value.filter(t => t.scenario === form.value.scenario)
 )
+
+// 切换沟通场景时，清空已选 agent 模版，避免上个场景的模版残留串台
+watch(() => form.value.scenario, () => { form.value.template_id = null })
 
 const hasRunning = computed(() => sessions.value.some(s => s.status === 'running'))
 
@@ -573,6 +576,7 @@ async function autoEndRunningVoiceOnLeave() {
 }
 
 async function sendReply(text) {
+  if (generating.value) return  // 防并发：生成中再次点击/回车/快捷回复，直接忽略，避免重复发起
   const content = text || replyText.value
   const images = text ? [] : pendingImages.value.slice()
   if (!content.trim() && !images.length) return
